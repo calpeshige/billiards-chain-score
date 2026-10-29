@@ -97,6 +97,11 @@
       </div>
       <ul class="roster" id="rosterList"></ul>
       <p class="hint">2人以上でスタートできます。並び順がそのままターンの順番です（↑↓で入れ替え）。</p>
+      <div class="addrow" style="margin-top:10px; align-items:center;">
+        <label for="foulSetup" style="font-size:14px;">ファウル点数（マイナス）</label>
+        <input id="foulSetup" type="number" min="0" max="99" value="2" style="flex:none; width:76px; text-align:center;">
+        <span style="font-size:14px;">点</span>
+      </div>
       <button class="btn-start" id="startBtn" disabled>ゲームスタート</button>
     </div>
     <div class="card">
@@ -105,8 +110,9 @@
         ・球は1〜15番全部を使う。落とした球は戻らない<br>
         ・1つ目の球はそのままの点数（例：2番 → +2点）<br>
         ・同じプレイヤーが連続で入れると「前の球 × 今の球」が点数（例：2の次に6 → +12点、その次に5 → +30点）<br>
+        ・ただし掛け算は1桁同士の時だけ。2桁の球（10〜15番）は掛け算されず、そのままの点数（例：4の次に11 → +11点）。2桁を入れた後はチェーンもリセット<br>
         ・外したらターン交代（ペナルティなし）<br>
-        ・ファウル（手玉を落とす／どの球にも当たらない）は −2点＆ターン交代<br>
+        ・ファウル（手玉を落とす／どの球にも当たらない）はマイナス点（デフォルト −2点、設定で変更可）＆ターン交代<br>
         ・15個全部落ちたら終了。一番点数が高い人が勝ち、低い人が負け
       </p>
     </div>
@@ -125,6 +131,11 @@
       <div class="actions">
         <button class="btn-miss" id="missBtn">外した（交代）</button>
         <button class="btn-foul" id="foulBtn">ファウル −2点</button>
+      </div>
+      <div class="addrow" style="margin-top:10px; align-items:center;">
+        <label for="foulGame" style="font-size:13px; color:#66756b;">ファウル点数の変更（マイナス）</label>
+        <input id="foulGame" type="number" min="0" max="99" value="2" style="flex:none; width:70px; text-align:center; font-size:15px; padding:7px; border:2px solid #cfd8d2; border-radius:8px;">
+        <span style="font-size:13px; color:#66756b;">点</span>
       </div>
       <button class="btn-undo" id="undoBtn">↩ ひとつ戻す</button>
     </div>
@@ -158,9 +169,10 @@ var BALL_COLORS = {1:"#f7d038",2:"#2456c8",3:"#e33224",4:"#5b2d90",5:"#f07d18",
 var LS_KEY = "chain-billiards-v1";
 
 var state = null;
-function freshState(players){
+function freshState(players, foulPenalty){
   return { players: players.map(function(n){return {name:n, score:0, log:[]};}),
-           current: 0, lastBall: null, pocketed: [], history: [], finished:false };
+           current: 0, lastBall: null, pocketed: [], history: [], finished:false,
+           foulPenalty: (typeof foulPenalty === "number" && foulPenalty >= 0) ? foulPenalty : 2 };
 }
 function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){} }
 function load(){ try{ var s = localStorage.getItem(LS_KEY); return s ? JSON.parse(s) : null; }catch(e){ return null; } }
@@ -196,7 +208,9 @@ function addPlayer(){
 document.getElementById("addBtn").onclick = addPlayer;
 nameInput.addEventListener("keydown", function(e){ if(e.key === "Enter") addPlayer(); });
 document.getElementById("startBtn").onclick = function(){
-  state = freshState(roster.slice());
+  var fp = parseInt(document.getElementById("foulSetup").value, 10);
+  if(isNaN(fp) || fp < 0) fp = 2;
+  state = freshState(roster.slice(), fp);
   save(); showGame(); toast("ゲームスタート！ " + state.players[0].name + " から");
 };
 
@@ -204,7 +218,8 @@ document.getElementById("startBtn").onclick = function(){
 function cur(){ return state.players[state.current]; }
 function snapshot(){
   state.history.push(JSON.stringify({ players: state.players, current: state.current,
-    lastBall: state.lastBall, pocketed: state.pocketed, finished: state.finished }));
+    lastBall: state.lastBall, pocketed: state.pocketed, finished: state.finished,
+    foulPenalty: state.foulPenalty }));
   if(state.history.length > 200) state.history.shift();
 }
 function toast(msg){
@@ -231,7 +246,7 @@ function pocket(n){
   if(state.finished || state.pocketed.indexOf(n) >= 0) return;
   snapshot();
   var p = cur();
-  var pts = (state.lastBall === null) ? n : state.lastBall * n;
+  var pts = (state.lastBall !== null && state.lastBall <= 9 && n <= 9) ? state.lastBall * n : n;
   p.score += pts;
   p.log.push(n + "番(+" + pts + ")");
   state.pocketed.push(n);
@@ -252,15 +267,17 @@ function miss(){
 function foul(){
   if(state.finished) return;
   snapshot();
-  var p = cur(); p.score -= 2; p.log.push("ファウル(-2)");
+  var fp = (typeof state.foulPenalty === "number") ? state.foulPenalty : 2;
+  var p = cur(); p.score -= fp; p.log.push("ファウル(-" + fp + ")");
   nextPlayer(); save(); render();
-  toast(p.name + " ファウル −2点。交代 → " + cur().name);
+  toast(p.name + " ファウル −" + fp + "点。交代 → " + cur().name);
 }
 function undo(){
   if(!state.history.length){ toast("戻せる操作がありません"); return; }
   var s = JSON.parse(state.history.pop());
   state.players = s.players; state.current = s.current; state.lastBall = s.lastBall;
   state.pocketed = s.pocketed; state.finished = s.finished;
+  if(typeof s.foulPenalty === "number") state.foulPenalty = s.foulPenalty;
   save(); render(); toast("ひとつ戻しました");
 }
 document.getElementById("missBtn").onclick = miss;
@@ -272,9 +289,15 @@ function render(){
   var ci = document.getElementById("chainInfo");
   if(state.lastBall === null){
     ci.innerHTML = "チェーンなし：次の球はそのままの点数";
+  } else if(state.lastBall <= 9){
+    ci.innerHTML = "前の球は <b>" + state.lastBall + "番</b>：次に1桁の球を入れると ×" + state.lastBall + " 倍！（2桁の球はそのままの点数）";
   } else {
-    ci.innerHTML = "前の球は <b>" + state.lastBall + "番</b>：次に入れると ×" + state.lastBall + " 倍！";
+    ci.innerHTML = "前の球は <b>" + state.lastBall + "番</b>（2桁）：次の球はそのままの点数。1桁を入れればチェーン開始";
   }
+  var fpNow = (typeof state.foulPenalty === "number") ? state.foulPenalty : 2;
+  document.getElementById("foulBtn").textContent = "ファウル −" + fpNow + "点";
+  var fg = document.getElementById("foulGame");
+  if(document.activeElement !== fg) fg.value = fpNow;
   var grid = document.getElementById("ballGrid");
   Array.prototype.forEach.call(grid.children, function(b){
     if(state.pocketed.indexOf(Number(b.dataset.ball)) >= 0) b.classList.add("done");
@@ -325,8 +348,16 @@ function showResult(){
 }
 document.getElementById("againBtn").onclick = function(){
   var names = state.players.map(function(p){ return p.name; });
-  state = freshState(names); save(); showGame(); toast("新しいゲーム！ " + names[0] + " から");
+  var fp = (typeof state.foulPenalty === "number") ? state.foulPenalty : 2;
+  state = freshState(names, fp); save(); showGame(); toast("新しいゲーム！ " + names[0] + " から");
 };
+document.getElementById("foulGame").addEventListener("change", function(){
+  if(!state) return;
+  var v = parseInt(this.value, 10);
+  if(isNaN(v) || v < 0) v = 2;
+  state.foulPenalty = v; save(); render();
+  toast("ファウル点数を −" + v + "点に変更しました");
+});
 document.getElementById("backBtn").onclick = function(){
   clearSave(); state = null;
   document.getElementById("result").classList.add("hidden");
