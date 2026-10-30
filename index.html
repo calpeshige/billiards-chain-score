@@ -253,6 +253,16 @@
   .sheet.open{transform:none;}
   .sheet .grip{width:40px; height:4px; border-radius:2px; background:var(--line-2); margin:0 auto 18px;}
   .sheet h3{margin:0 0 16px; font-size:18px; font-weight:900;}
+  .sheet .lead{margin:-8px 0 16px; color:var(--muted); font-size:13px; line-height:1.6;}
+  .choice{display:block; width:100%; text-align:left; padding:14px 16px; margin-bottom:10px; border-radius:16px;
+          background:var(--bg); border:1px solid var(--line-2); transition:transform .1s;}
+  .choice:active{transform:scale(.98);}
+  .choice .ct{font-weight:900; font-size:16px;}
+  .choice .cd{color:var(--muted); font-size:12px; margin-top:4px; line-height:1.6;}
+  .choice .cr{display:inline-block; margin-top:8px; font-family:var(--num); font-size:11px; letter-spacing:.14em;
+              padding:2px 8px; border-radius:999px; border:1px solid currentColor;}
+  .choice.rebreak .cr{color:#5cb8ff;}
+  .choice.broken .cr{color:var(--muted);}
   .sheet .sec{margin-top:22px;}
   .btn-danger-outline{width:100%; height:50px; border-radius:14px; font-weight:700; font-size:15px; margin-top:10px;
                       color:var(--danger); border:1px solid rgba(255,79,96,.4); background:rgba(255,79,96,.06);}
@@ -395,6 +405,24 @@
 </div>
 
 <div class="scrim" id="scrim"></div>
+<div class="sheet" id="foulSheet">
+  <div class="wrap">
+    <div class="grip"></div>
+    <h3>ブレイクのファウル</h3>
+    <p class="lead" id="foulSheetLead">ペナルティを引いて交代します。ラックの状態を選んでください。</p>
+    <button class="choice rebreak" id="foulRebreak">
+      <div class="ct">ラックが崩れていない</div>
+      <div class="cd">空振り・どの球にも当たらなかった など</div>
+      <span class="cr">次のプレイヤーがもう一度ブレイク</span>
+    </button>
+    <button class="choice broken" id="foulBroken">
+      <div class="ct">ラックが崩れた</div>
+      <div class="cd">手玉がポケットに入った など</div>
+      <span class="cr">次のプレイヤーは通常プレイ</span>
+    </button>
+    <button class="btn-ghost" id="foulCancel">キャンセル</button>
+  </div>
+</div>
 <div class="sheet" id="sheet">
   <div class="wrap">
     <div class="grip"></div>
@@ -432,7 +460,7 @@ var LS_KEY = "chain-billiards-v1";
 var RULES = [
   "球は<b>1〜15番</b>を全部使う。落とした球はテーブルに戻らない",
   "<b>ブレイクボーナス</b>：ブレイクで入った球は「合計 ＋ 個数 × ボーナス点」 <span class='ex'>3・7・12 → 22 + 3×5 = <span class='g'>+37</span></span>。続投はチェーンなしから",
-  "ブレイクでファウルしたら、入った球の点数は無効でマイナス点＆交代",
+  "ブレイクでファウルしたら、入った球の点数は無効でマイナス点＆交代。空振りなどで<b>ラックが崩れていなければ、次の人がブレイクし直し</b>（ボーナスあり）",
   "1つ目の球はそのままの点数 <span class='ex'>2番 → <span class='g'>+2</span></span>",
   "同じプレイヤーが連続で入れると<b>「前の球 × 今の球」</b> <span class='ex'>2 → 6 = <span class='g'>+12</span></span> <span class='ex'>→ 5 = <span class='g'>+30</span></span>",
   "掛け算は<b>1桁同士だけ</b>。10〜15番はそのままの点数で、入れた後はチェーンもリセット <span class='ex'>4 → 11 = <span class='g'>+11</span></span>",
@@ -652,16 +680,26 @@ function confirmBreak(){
 }
 function foul(){
   if(state.finished) return;
+  // ブレイクで1個も入っていないファウルは、ラックが崩れたかどうかを確認する
+  if(state.breaking && !state.breakBalls.length){
+    $("foulSheetLead").textContent = cur().name + " に −" + foulPts() + "点のペナルティで交代します。ラックの状態を選んでください。";
+    $("scrim").classList.add("open"); $("foulSheet").classList.add("open");
+    return;
+  }
+  commitFoul(false);
+}
+function commitFoul(rebreak){
   snapshot();
   var fp = foulPts();
   var p = cur(); p.score -= fp; p.log.push((state.breaking ? "ブレイクファウル" : "ファウル") + "(-" + fp + ")");
   if(state.breaking){
-    // ブレイクでのファウル：入った球は戻さないが点数は無効
-    state.breaking = false; state.breakBalls = [];
+    // ブレイクでのファウル：入った球は戻さないが点数は無効。
+    // ラックが崩れていなければ次のプレイヤーがブレイクし直す
+    state.breaking = !!rebreak; state.breakBalls = [];
     if(state.pocketed.length >= 15) state.finished = true;
   }
   nextPlayer(); save(); render(true); buzz([30, 50, 30]);
-  toast(p.name + " ファウル −" + fp + "点 → " + cur().name + " のターン");
+  toast(p.name + " ファウル −" + fp + "点 → " + cur().name + (rebreak ? " がブレイク" : " のターン"));
   if(state.finished) setTimeout(showResult, 900);
 }
 function undo(){
@@ -794,12 +832,15 @@ $("backBtn").onclick = backToSetup;
 /* ---------- メニュー ---------- */
 function openSheet(){ $("scrim").classList.add("open"); $("sheet").classList.add("open"); }
 function closeSheet(){
-  $("scrim").classList.remove("open"); $("sheet").classList.remove("open");
+  $("scrim").classList.remove("open"); $("sheet").classList.remove("open"); $("foulSheet").classList.remove("open");
   var q = $("quitBtn"); q.classList.remove("arm"); q.textContent = "ゲームをやめて名簿に戻る";
 }
 $("menuBtn").onclick = openSheet;
 $("scrim").onclick = closeSheet;
 $("closeSheet").onclick = closeSheet;
+$("foulCancel").onclick = closeSheet;
+$("foulRebreak").onclick = function(){ closeSheet(); commitFoul(true); };
+$("foulBroken").onclick = function(){ closeSheet(); commitFoul(false); };
 Array.prototype.forEach.call(document.querySelectorAll("#foulGameStepper button"), function(b){
   b.onclick = function(){
     if(!state) return;
