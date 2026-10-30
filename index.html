@@ -266,6 +266,17 @@
               padding:2px 8px; border-radius:999px; border:1px solid currentColor;}
   .choice.rebreak .cr{color:#5cb8ff;}
   .choice.broken .cr{color:var(--muted);}
+  .ret-list{display:flex; flex-wrap:wrap; gap:14px 12px; padding:6px 2px 18px;}
+  .ret{width:64px; display:flex; flex-direction:column; align-items:center; gap:6px; transition:opacity .2s;}
+  .ret .ball{width:52px;}
+  .ret .rp{font-family:var(--num); font-size:12px; color:var(--muted);}
+  .ret .rt{font-size:10px; font-weight:700; letter-spacing:.06em; padding:1px 7px; border-radius:999px;
+           border:1px solid var(--line-2); color:var(--dim); white-space:nowrap;}
+  .ret.on .ball{outline:3px solid var(--danger); outline-offset:3px; border-radius:50%;}
+  .ret.on .rt{background:var(--danger); border-color:var(--danger); color:#fff;}
+  .ret.on .rp{color:var(--danger); text-decoration:line-through;}
+  .btn-foul-confirm{width:100%; height:54px; border-radius:16px; font-weight:900; font-size:16px; color:#fff;
+                    background:linear-gradient(180deg,#ff6b79,var(--danger) 55%,#d63446);}
   .sheet .sec{margin-top:22px;}
   .btn-danger-outline{width:100%; height:50px; border-radius:14px; font-weight:700; font-size:15px; margin-top:10px;
                       color:var(--danger); border:1px solid rgba(255,79,96,.4); background:rgba(255,79,96,.06);}
@@ -491,6 +502,16 @@
 </main>
 
 <div class="scrim" id="scrim"></div>
+<div class="sheet" id="returnSheet">
+  <div class="wrap">
+    <div class="grip"></div>
+    <h3>ファウル：戻す球を選択</h3>
+    <p class="lead" id="returnLead"></p>
+    <div class="ret-list" id="returnList"></div>
+    <button class="btn-foul-confirm" id="returnConfirm"></button>
+    <button class="btn-ghost" id="returnCancel">キャンセル</button>
+  </div>
+</div>
 <div class="sheet" id="foulSheet">
   <div class="wrap">
     <div class="grip"></div>
@@ -553,7 +574,7 @@ var RULES = [
   "同じプレイヤーが連続で入れると<b>「前の球 × 今の球」</b> <span class='ex'>2 → 6 = <span class='g'>+12</span></span> <span class='ex'>→ 5 = <span class='g'>+30</span></span>",
   "掛け算は<b>1桁同士だけ</b>。10〜15番はそのままの点数で、入れた後はチェーンもリセット <span class='ex'>4 → 11 = <span class='g'>+11</span></span>",
   "外したらターン交代（ペナルティなし）",
-  "ファウル（手玉を落とす／どの球にも当たらない）は<b>マイナス点</b>＆ターン交代",
+  "ファウル（手玉を落とす／どの球にも当たらない）は<b>マイナス点</b>＆ターン交代。ファウルしたショットで入った球は<b>台に戻し、その点数も取り消し</b>",
   "15個全部落ちたら終了。最高点が勝ち、最低点が負け"
 ];
 var $ = function(id){ return document.getElementById(id); };
@@ -564,7 +585,7 @@ function freshState(players, foulPenalty, breakBonus){
            current: 0, lastBall: null, pocketed: [], history: [], finished:false,
            foulPenalty: (typeof foulPenalty === "number" && foulPenalty >= 0) ? foulPenalty : 2,
            breakBonus: (typeof breakBonus === "number" && breakBonus >= 0) ? breakBonus : 5,
-           breaking: true, breakBalls: [] };
+           breaking: true, breakBalls: [], turnBalls: [] };
 }
 function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){} }
 function load(){ try{ var s = localStorage.getItem(LS_KEY); return s ? JSON.parse(s) : null; }catch(e){ return null; } }
@@ -669,7 +690,8 @@ function ptsFor(n){ return (state.lastBall !== null && state.lastBall <= 9 && n 
 function snapshot(){
   state.history.push(JSON.stringify({ players: state.players, current: state.current,
     lastBall: state.lastBall, pocketed: state.pocketed, finished: state.finished,
-    foulPenalty: state.foulPenalty, breaking: state.breaking, breakBalls: state.breakBalls }));
+    foulPenalty: state.foulPenalty, breaking: state.breaking, breakBalls: state.breakBalls,
+    turnBalls: state.turnBalls }));
   if(state.history.length > 200) state.history.shift();
 }
 function toast(msg){
@@ -726,6 +748,7 @@ function pocket(n, el){
   p.score += pts;
   p.log.push(n + "番(+" + pts + ")");
   state.pocketed.push(n);
+  state.turnBalls = (state.turnBalls || []).concat({ n: n, pts: pts });
   state.lastBall = n;
   buzz(pts > n ? [12, 40, 18] : 12);
   if(state.pocketed.length >= 15) state.finished = true;
@@ -740,6 +763,7 @@ function pocket(n, el){
 function nextPlayer(){
   state.current = (state.current + 1) % state.players.length;
   state.lastBall = null;
+  state.turnBalls = [];
 }
 function miss(){
   if(state.finished) return;
@@ -773,12 +797,27 @@ function foul(){
     $("scrim").classList.add("open"); $("foulSheet").classList.add("open");
     return;
   }
-  commitFoul(false);
+  // このターンに入れた球があれば、ファウルのショットで入った（台に戻す）球を選ぶ
+  if(!state.breaking && state.turnBalls && state.turnBalls.length){ openReturnSheet(); return; }
+  commitFoul(false, 0);
 }
-function commitFoul(rebreak){
+/* rebreak: 次のプレイヤーがブレイクし直す / ret: ターン末尾から台に戻す球の個数 */
+function commitFoul(rebreak, ret){
   snapshot();
   var fp = foulPts();
-  var p = cur(); p.score -= fp; p.log.push((state.breaking ? "ブレイクファウル" : "ファウル") + "(-" + fp + ")");
+  var p = cur(), back = [];
+  if(ret > 0){
+    // 戻す球はターンの最後に入れた球なので、ログ・ポケット済みリストの末尾から取り消す
+    back = state.turnBalls.slice(-ret);
+    back.forEach(function(b){
+      p.score -= b.pts;
+      state.pocketed = state.pocketed.filter(function(x){ return x !== b.n; });
+    });
+    p.log = p.log.slice(0, p.log.length - ret);
+  }
+  p.score -= fp;
+  p.log.push((state.breaking ? "ブレイクファウル" : "ファウル") + "(-" + fp + ")" +
+    (back.length ? "・" + back.map(function(b){ return b.n; }).join("・") + "番を戻す" : ""));
   if(state.breaking){
     // ブレイクでのファウル：入った球は戻さないが点数は無効。
     // ラックが崩れていなければ次のプレイヤーがブレイクし直す
@@ -786,7 +825,8 @@ function commitFoul(rebreak){
     if(state.pocketed.length >= 15) state.finished = true;
   }
   nextPlayer(); save(); render(true); buzz([30, 50, 30]);
-  toast(p.name + " ファウル −" + fp + "点 → " + cur().name + (rebreak ? " がブレイク" : " のターン"));
+  toast(p.name + " ファウル −" + fp + "点" + (back.length ? "（" + back.length + "個戻す）" : "") +
+    " → " + cur().name + (rebreak ? " がブレイク" : " のターン"));
   if(state.finished) setTimeout(showResult, 900);
 }
 function undo(){
@@ -795,7 +835,7 @@ function undo(){
   state.players = s.players; state.current = s.current; state.lastBall = s.lastBall;
   state.pocketed = s.pocketed; state.finished = s.finished;
   if(typeof s.foulPenalty === "number") state.foulPenalty = s.foulPenalty;
-  state.breaking = !!s.breaking; state.breakBalls = s.breakBalls || [];
+  state.breaking = !!s.breaking; state.breakBalls = s.breakBalls || []; state.turnBalls = s.turnBalls || [];
   save(); render(true); toast("ひとつ戻しました");
 }
 $("missBtn").onclick = miss;
@@ -920,14 +960,49 @@ $("backBtn").onclick = backToSetup;
 function openSheet(){ $("scrim").classList.add("open"); $("sheet").classList.add("open"); }
 function closeSheet(){
   $("scrim").classList.remove("open"); $("sheet").classList.remove("open"); $("foulSheet").classList.remove("open");
+  $("returnSheet").classList.remove("open");
 }
 $("menuBtn").onclick = openSheet;
 $("scrim").onclick = closeSheet;
 $("closeSheet").onclick = closeSheet;
 $("closeSheetX").onclick = closeSheet;
 $("foulCancel").onclick = closeSheet;
-$("foulRebreak").onclick = function(){ closeSheet(); commitFoul(true); };
-$("foulBroken").onclick = function(){ closeSheet(); commitFoul(false); };
+$("foulRebreak").onclick = function(){ closeSheet(); commitFoul(true, 0); };
+$("foulBroken").onclick = function(){ closeSheet(); commitFoul(false, 0); };
+
+/* ---------- ファウル時に台へ戻す球の選択 ---------- */
+var returnCount = 0;
+function openReturnSheet(){
+  returnCount = 0;
+  $("returnLead").textContent = cur().name + " に −" + foulPts() + "点のペナルティで交代します。" +
+    "ファウルしたショットで入った球をタップしてください（その球より後に入れた球も一緒に戻ります）。";
+  renderReturnSheet();
+  $("scrim").classList.add("open"); $("returnSheet").classList.add("open");
+}
+function renderReturnSheet(){
+  var list = $("returnList"), tb = state.turnBalls;
+  list.innerHTML = "";
+  tb.forEach(function(b, i){
+    var on = i >= tb.length - returnCount;
+    var item = document.createElement("button");
+    item.className = "ret" + (on ? " on" : "");
+    item.appendChild(ballEl(b.n));
+    item.insertAdjacentHTML("beforeend", '<span class="rp">+' + b.pts + '</span><span class="rt">' + (on ? "戻す" : "そのまま") + "</span>");
+    item.onclick = function(){
+      // タップした球から最後までを選択。選択範囲の先頭をもう一度タップすると1つ後ろへ縮める
+      var n = tb.length - i;
+      returnCount = (returnCount === n) ? n - 1 : n;
+      renderReturnSheet();
+    };
+    list.appendChild(item);
+  });
+  var lost = tb.slice(tb.length - returnCount).reduce(function(a, b){ return a + b.pts; }, 0);
+  $("returnConfirm").textContent = returnCount ?
+    "ファウル確定（" + returnCount + "個戻す・合計 −" + (lost + foulPts()) + "点）" :
+    "ファウル確定（戻す球なし・−" + foulPts() + "点）";
+}
+$("returnConfirm").onclick = function(){ closeSheet(); commitFoul(false, returnCount); };
+$("returnCancel").onclick = closeSheet;
 Array.prototype.forEach.call(document.querySelectorAll("#foulGameStepper button"), function(b){
   b.onclick = function(){
     if(!state) return;
@@ -959,6 +1034,7 @@ if(saved && saved.players && saved.players.length >= 2){
   state = saved; roster = saved.players.map(function(p){ return p.name; });
   setupFoul = foulPts(); setupBonus = bonusPts();
   if(!state.breakBalls) state.breakBalls = [];
+  if(!state.turnBalls) state.turnBalls = [];
   renderRoster();
   if(state.finished){ buildBalls(); showResult(); }
   else showGame();
