@@ -253,6 +253,8 @@
   .sheet.open{transform:none;}
   .sheet .grip{width:40px; height:4px; border-radius:2px; background:var(--line-2); margin:0 auto 18px;}
   .sheet h3{margin:0 0 16px; font-size:18px; font-weight:900;}
+  .sheet-head{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px;}
+  .sheet-head h3{margin:0;}
   .sheet .lead{margin:-8px 0 16px; color:var(--muted); font-size:13px; line-height:1.6;}
   .choice{display:block; width:100%; text-align:left; padding:14px 16px; margin-bottom:10px; border-radius:16px;
           background:var(--bg); border:1px solid var(--line-2); transition:transform .1s;}
@@ -426,7 +428,12 @@
 <div class="sheet" id="sheet">
   <div class="wrap">
     <div class="grip"></div>
-    <h3>メニュー</h3>
+    <div class="sheet-head">
+      <h3>メニュー</h3>
+      <button class="icon-btn" id="closeSheetX" aria-label="閉じる">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
     <div id="sheetGameOnly">
       <p class="label">Settings</p>
       <div class="setting">
@@ -838,6 +845,7 @@ function closeSheet(){
 $("menuBtn").onclick = openSheet;
 $("scrim").onclick = closeSheet;
 $("closeSheet").onclick = closeSheet;
+$("closeSheetX").onclick = closeSheet;
 $("foulCancel").onclick = closeSheet;
 $("foulRebreak").onclick = function(){ closeSheet(); commitFoul(true); };
 $("foulBroken").onclick = function(){ closeSheet(); commitFoul(false); };
