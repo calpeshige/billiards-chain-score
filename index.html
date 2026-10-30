@@ -169,6 +169,7 @@
   .chain .d{font-size:12px; color:var(--muted); margin-top:2px; line-height:1.5;}
   .chain .mini-ball{width:34px; height:34px; flex:none;}
 
+  .rack-pad{height:10px;}
   .rack{display:grid; grid-template-columns:repeat(5,1fr); gap:clamp(10px,3.4vw,16px); padding:4px 2px 2px;}
 
   /* ボール */
@@ -283,6 +284,83 @@
   @keyframes pulse{50%{opacity:.35;}}
   @keyframes popup{0%{opacity:0; transform:translateY(8px) scale(.8);} 15%{opacity:1; transform:translateY(0) scale(1.1);} 70%{opacity:1;} 100%{opacity:0; transform:translateY(-26px);}}
   @keyframes sink{to{transform:scale(.3); opacity:0;}}
+  /* ---------- 横向きレイアウト ---------- */
+  @media (orientation: landscape) and (min-width: 600px){
+    .wrap{max-width:1180px; padding-left:max(16px, env(safe-area-inset-left)); padding-right:max(16px, env(safe-area-inset-right));}
+    .topbar .wrap{height:48px;}
+    main{padding:12px 0 16px;}
+    .label{margin-bottom:8px;}
+
+    /* セットアップ：左にタイトルとスタート、右に名簿と設定 */
+    #setup:not(.hidden){display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.15fr); column-gap:20px;
+      grid-template-areas:"hero players" "start players" "start settings" ". settings"; align-items:start;}
+    #setup .hero{grid-area:hero; padding:10px 0 16px;}
+    #setup .hero h1{font-size:clamp(40px,7vw,72px);}
+    #setup .p-players{grid-area:players;}
+    #setup .p-settings{grid-area:settings;}
+    #setup .start-area{grid-area:start;}
+
+    /* ゲーム：左にボール、右に手番・順位・操作ボタン（画面内に収める） */
+    #game:not(.hidden){display:grid; padding-bottom:0; column-gap:14px; row-gap:10px;
+      grid-template-columns:minmax(0,1.25fr) minmax(300px,1fr);
+      grid-template-rows:auto minmax(0,1fr) auto;
+      grid-template-areas:"rack stage" "rack board" "rack dock";
+      height:calc(100dvh - 48px - 28px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); min-height:300px;}
+    #game .stage{grid-area:stage; margin:0; padding:12px 16px;}
+    #game .rack-panel{grid-area:rack; margin:0; display:flex; flex-direction:column; min-height:0; padding:14px 18px;}
+    #game .rack-panel .rack{flex:1; min-height:0; align-content:center; margin:0 auto;
+      width:min(100%, calc((100dvh - 48px - 28px - 74px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 5 / 3));}
+    #game .rack-pad{height:4px;}
+    #game .board-panel{grid-area:board; margin:0; min-height:0; overflow:auto; padding:12px 14px;}
+    #game .board li{padding:8px 12px; margin-bottom:6px;}
+    #game .board .sc{font-size:19px;}
+    .now .who{font-size:clamp(18px,2.6vw,26px); margin-top:2px;}
+    .now .next{margin-top:2px;}
+    .score-big .v{font-size:clamp(34px,5vw,52px);}
+    .chain{margin-top:10px; padding:8px 12px;}
+    .chain .mul{font-size:22px; min-width:48px;}
+    .chain.brk .mul{font-size:16px;}
+    .chain .mini-ball{width:28px; height:28px;}
+
+    .dock{grid-area:dock; position:static; padding:0; background:none; z-index:auto;}
+    .dock .wrap{max-width:none; padding:0; grid-template-columns:52px 1fr 1fr; gap:8px;}
+    .dock button{height:54px; font-size:15px;}
+    .toast, body.no-dock .toast{top:calc(56px + env(safe-area-inset-top)); bottom:auto; transform:translate(-50%,-12px);}
+    .toast.show{transform:translate(-50%,0);}
+
+    /* 結果：左に優勝者とボタン、右に最終順位 */
+    #result:not(.hidden){display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.2fr); column-gap:20px;
+      grid-template-areas:"champ final" "actions final" ". final"; align-items:start;}
+    #result .champ{grid-area:champ; margin-bottom:14px;}
+    #result .final-panel{grid-area:final;}
+    #result .result-actions{grid-area:actions;}
+  }
+  /* スマホの横向き（高さが低い）：手番エリアを詰めて順位表の場所を確保 */
+  @media (orientation: landscape) and (min-width: 600px) and (max-height: 500px){
+    #game .stage{padding:10px 14px;}
+    .now .tag, .chain .d, #game .board-panel .label{display:none;}
+    .chain{margin-top:8px; padding:6px 10px;}
+    .chain .calc{margin-top:0;}
+    #game .board-panel{padding:8px 10px;}
+    #game .board li{padding:5px 10px; margin-bottom:4px; gap:8px;}
+    #game .board .sc{font-size:16px;}
+    #game .board .nm{font-size:14px;}
+    .dock button{height:50px;}
+    #result .champ{padding:14px 16px;}
+    .champ .crown{font-size:26px; margin:6px 0 0;}
+    .champ .w{font-size:24px;}
+    .champ .p{font-size:40px;}
+    #result .btn-primary{height:50px;}
+    #setup .hero{padding:4px 0 12px;}
+  }
+  /* 横向きでも高さに余裕がある画面（タブレット等）は表示を大きく */
+  @media (orientation: landscape) and (min-width: 600px) and (min-height: 700px){
+    .now .who{font-size:clamp(22px,2.8vw,32px);}
+    .score-big .v{font-size:clamp(44px,5.5vw,64px);}
+    .chain{margin-top:14px; padding:12px 14px;}
+    #game:not(.hidden){grid-template-columns:minmax(0,1.5fr) minmax(320px,1fr);}
+  }
+
   @media (prefers-reduced-motion: reduce){ *{animation:none !important; transition:none !important;} }
 </style>
 </head>
@@ -310,7 +388,7 @@
       <p>連続で沈めるほど点数が<b>掛け算</b>で跳ね上がる、<br>新しいビリヤードゲーム。</p>
     </div>
 
-    <div class="panel">
+    <div class="panel p-players">
       <p class="label">Players</p>
       <div class="field">
         <input id="nameInput" type="text" placeholder="プレイヤー名を入力" autocomplete="off" enterkeyhint="done" maxlength="20">
@@ -320,7 +398,7 @@
       <p class="empty" id="rosterEmpty">2人以上でスタートできます。並び順がターンの順番です。</p>
     </div>
 
-    <div class="panel">
+    <div class="panel p-settings">
       <p class="label">Settings</p>
       <div class="setting">
         <div><div class="t">ファウルのペナルティ</div><div class="s">手玉を落とす／どの球にも当たらない</div></div>
@@ -340,8 +418,10 @@
       </div>
     </div>
 
-    <button class="btn-primary" id="startBtn" disabled>GAME START</button>
-    <p class="note">途中の状態は自動保存。閉じても続きから再開できます。<br>ルールは右上の ≡ から確認できます。</p>
+    <div class="start-area">
+      <button class="btn-primary" id="startBtn" disabled>GAME START</button>
+      <p class="note">途中の状態は自動保存。閉じても続きから再開できます。<br>ルールは右上の ≡ から確認できます。</p>
+    </div>
   </section>
 
   <!-- ゲーム -->
@@ -366,15 +446,25 @@
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel rack-panel">
       <p class="label">Tap the pocketed ball</p>
       <div class="rack" id="ballGrid"></div>
-      <div style="height:10px"></div>
+      <div class="rack-pad"></div>
     </div>
 
-    <div class="panel">
+    <div class="panel board-panel">
       <p class="label">Leaderboard</p>
       <ul class="board" id="scoreBody"></ul>
+    </div>
+
+    <div class="dock hidden" id="dock">
+      <div class="wrap">
+        <button class="b-undo" id="undoBtn" aria-label="ひとつ戻す">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>
+        </button>
+        <button class="b-miss" id="missBtn"><span id="missLabel">外した</span><small id="missSub">NEXT PLAYER</small></button>
+        <button class="b-foul" id="foulBtn"><span id="foulLabel">ファウル −2</span><small>FOUL</small></button>
+      </div>
     </div>
   </section>
 
@@ -386,25 +476,17 @@
       <div class="w" id="winnerName"></div>
       <div class="p" id="winnerScore"></div>
     </div>
-    <div class="panel">
+    <div class="panel final-panel">
       <p class="label">Final standings</p>
       <ul class="board final" id="finalBody"></ul>
     </div>
-    <button class="btn-primary" id="againBtn">同じメンバーでもう一度</button>
-    <button class="btn-ghost" id="backBtn">名簿に戻る</button>
+    <div class="result-actions">
+      <button class="btn-primary" id="againBtn">同じメンバーでもう一度</button>
+      <button class="btn-ghost" id="backBtn">名簿に戻る</button>
+    </div>
   </section>
 
 </main>
-
-<div class="dock hidden" id="dock">
-  <div class="wrap">
-    <button class="b-undo" id="undoBtn" aria-label="ひとつ戻す">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>
-    </button>
-    <button class="b-miss" id="missBtn"><span id="missLabel">外した</span><small id="missSub">NEXT PLAYER</small></button>
-    <button class="b-foul" id="foulBtn"><span id="foulLabel">ファウル −2</span><small>FOUL</small></button>
-  </div>
-</div>
 
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="foulSheet">
