@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#07090a">
 <title>チェーンボール</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="チェーンボール">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -553,6 +560,14 @@
       <p class="label">How to play</p>
       <ol class="rules" id="rulesSheet"></ol>
     </div>
+    <div class="sec" id="installSec">
+      <p class="label">Add to home screen</p>
+      <button class="btn-primary hidden" id="installBtn">ホーム画面に追加</button>
+      <ol class="rules" id="installHow">
+        <li><b>iPhone / iPad（Safari）</b>：画面下の共有ボタン（□に↑）→「ホーム画面に追加」</li>
+        <li><b>Android（Chrome）</b>：右上の ⋮ →「ホーム画面に追加」または「アプリをインストール」</li>
+      </ol>
+    </div>
     <button class="btn-ghost" id="closeSheet">閉じる</button>
   </div>
 </div>
@@ -1036,6 +1051,25 @@ if(saved && saved.players && saved.players.length >= 2){
 } else {
   showScreen("setup");
   renderRoster();
+}
+
+/* ---------- ホーム画面に追加（PWA） ---------- */
+var isStandalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true;
+if(isStandalone) $("installSec").classList.add("hidden");
+var installPrompt = null;
+window.addEventListener("beforeinstallprompt", function(e){
+  // Android / PC の Chrome では、メニュー内のボタンから直接インストールできる
+  e.preventDefault(); installPrompt = e;
+  $("installBtn").classList.remove("hidden");
+});
+$("installBtn").onclick = function(){
+  if(!installPrompt) return;
+  installPrompt.prompt();
+  installPrompt.userChoice.then(function(){ installPrompt = null; $("installBtn").classList.add("hidden"); });
+};
+window.addEventListener("appinstalled", function(){ $("installSec").classList.add("hidden"); toast("ホーム画面に追加しました"); });
+if("serviceWorker" in navigator){
+  window.addEventListener("load", function(){ navigator.serviceWorker.register("/sw.js").catch(function(){}); });
 }
 </script>
 </body>
