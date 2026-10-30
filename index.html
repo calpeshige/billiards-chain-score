@@ -3,170 +3,426 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>チェーン・ビリヤード スコア</title>
+<meta name="theme-color" content="#07090a">
+<title>チェーンボール</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
   :root{
-    --felt:#0b6e3f; --felt-dark:#07522e; --ink:#14231a; --paper:#f7f5ef;
-    --accent:#ffb703; --danger:#e63946; --card:#ffffff;
+    --bg:#07090a; --surface:#0f1413; --surface-2:#161d1b; --surface-3:#1e2724;
+    --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.13);
+    --text:#eef3f0; --muted:#8b9893; --dim:#5c6964;
+    --felt:#16c47f; --felt-deep:#0a7a4d; --gold:#f2c14e; --gold-deep:#b9862a;
+    --danger:#ff4f60; --miss:#3d4a46;
+    --num:"Oswald","Noto Sans JP",sans-serif;
+    --radius:18px;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-  body{margin:0; font-family:"Noto Sans CJK JP","Hiragino Kaku Gothic ProN",sans-serif;
-       background:var(--felt-dark); color:var(--ink);}
-  header{background:var(--felt); color:#fff; padding:14px 16px 10px; text-align:center;
-         border-bottom:4px solid #5a3a1a;}
-  header h1{margin:0; font-size:20px; letter-spacing:.04em;}
-  header p{margin:4px 0 2px; font-size:12px; opacity:.85;}
-  main{max-width:560px; margin:0 auto; padding:14px 14px 40px;}
-  .card{background:var(--card); border-radius:14px; padding:16px; margin-bottom:14px;
-        box-shadow:0 2px 8px rgba(0,0,0,.25);}
-  h2{font-size:15px; margin:0 0 10px; color:var(--felt-dark);}
-  /* セットアップ */
-  .addrow{display:flex; gap:8px;}
-  .addrow input{flex:1; font-size:16px; padding:10px 12px; border:2px solid #cfd8d2;
-                border-radius:10px; min-width:0;}
-  button{font-family:inherit; cursor:pointer; border:none; border-radius:10px;
-         font-size:15px; padding:10px 14px;}
-  .btn-add{background:var(--felt); color:#fff; font-weight:700;}
-  .btn-start{width:100%; background:var(--accent); color:#231900; font-weight:800;
-             font-size:17px; padding:13px; margin-top:6px;}
-  .btn-start:disabled{opacity:.4;}
-  ul.roster{list-style:none; margin:12px 0 4px; padding:0;}
-  ul.roster li{display:flex; align-items:center; gap:8px; padding:8px 10px;
-               background:var(--paper); border-radius:10px; margin-bottom:6px; font-size:16px;}
-  ul.roster .num{background:var(--felt); color:#fff; width:24px; height:24px; flex:none;
-                 border-radius:50%; display:flex; align-items:center; justify-content:center;
-                 font-size:13px; font-weight:700;}
-  ul.roster .sp{flex:1;}
-  .mini{padding:5px 9px; font-size:13px; background:#e7ece8; border-radius:8px;}
-  .mini.del{background:#fbe3e5; color:#a4133c;}
-  .hint{font-size:12px; color:#66756b; margin-top:8px; line-height:1.6;}
-  /* ゲーム画面 */
-  .turn-banner{text-align:center; padding:6px 0 2px;}
-  .turn-banner .who{font-size:24px; font-weight:800; color:var(--felt-dark);}
-  .turn-banner .chain{font-size:14px; margin-top:4px; color:#555;}
-  .turn-banner .chain b{color:var(--danger); font-size:17px;}
-  .balls{display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-top:6px;}
-  .ball{position:relative; aspect-ratio:1; border-radius:50%; border:none; cursor:pointer;
-        display:flex; align-items:center; justify-content:center;
-        box-shadow:inset -4px -6px 10px rgba(0,0,0,.35), 0 2px 5px rgba(0,0,0,.3);}
-  .ball .n{background:#fff; width:58%; height:58%; border-radius:50%;
-           display:flex; align-items:center; justify-content:center;
-           font-weight:800; font-size:clamp(15px,5vw,21px); color:#111;}
-  .ball.striped{background:linear-gradient(to bottom,#f5f2ea 22%, var(--c) 22%, var(--c) 78%, #f5f2ea 78%);}
-  .ball.solid{background:var(--c);}
-  .ball.done{opacity:.16; pointer-events:none; filter:grayscale(.6);}
-  .actions{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
-  .btn-miss{background:#38618c; color:#fff; font-weight:700; padding:14px 8px; font-size:16px;}
-  .btn-foul{background:var(--danger); color:#fff; font-weight:700; padding:14px 8px; font-size:16px;}
-  .btn-undo{width:100%; background:#e7ece8; margin-top:10px; padding:11px;}
+  html,body{margin:0; background:var(--bg); color:var(--text);}
+  body{font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN",sans-serif; min-height:100vh;
+       background:
+         radial-gradient(120% 60% at 50% -10%, rgba(22,196,127,.16), transparent 60%),
+         radial-gradient(80% 40% at 100% 0%, rgba(242,193,78,.06), transparent 60%),
+         var(--bg);
+       background-attachment:fixed; -webkit-font-smoothing:antialiased;}
+  button{font-family:inherit; color:inherit; cursor:pointer; border:none; background:none; padding:0;}
+  input{font-family:inherit;}
+  .hidden{display:none !important;}
+  .wrap{max-width:560px; margin:0 auto; padding:0 16px;}
+
+  /* ---------- トップバー ---------- */
+  .topbar{position:sticky; top:0; z-index:5; backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+          background:rgba(7,9,10,.72); border-bottom:1px solid var(--line);
+          padding-top:env(safe-area-inset-top);}
+  .topbar .wrap{display:flex; align-items:center; gap:12px; height:56px;}
+  .brand{display:flex; align-items:center; gap:10px; flex:1; min-width:0;}
+  .mark{width:28px; height:28px; flex:none; position:relative;}
+  .mark i{position:absolute; width:18px; height:18px; border-radius:50%;
+          box-shadow:inset -3px -3px 6px rgba(0,0,0,.45);}
+  .mark i:nth-child(1){left:0; top:5px; background:radial-gradient(circle at 35% 30%,#fff7 0 12%,transparent 30%),var(--gold);}
+  .mark i:nth-child(2){left:10px; top:5px; background:radial-gradient(circle at 35% 30%,#fff7 0 12%,transparent 30%),var(--felt);}
+  .wordmark{font-family:var(--num); font-weight:700; font-size:19px; letter-spacing:.14em; line-height:1;}
+  .wordmark small{display:block; font-family:"Noto Sans JP",sans-serif; font-weight:500;
+                  font-size:10px; letter-spacing:.2em; color:var(--muted); margin-top:3px;}
+  .chip{font-family:var(--num); font-size:13px; letter-spacing:.08em; color:var(--muted);
+        border:1px solid var(--line-2); border-radius:999px; padding:5px 11px; white-space:nowrap;}
+  .chip b{color:var(--text); font-weight:600;}
+  .icon-btn{width:40px; height:40px; border-radius:12px; display:grid; place-items:center;
+            background:var(--surface-2); border:1px solid var(--line); flex:none;}
+  .icon-btn svg{width:20px; height:20px;}
+
+  main{padding:20px 0 40px;}
+  .label{font-family:var(--num); font-size:12px; letter-spacing:.22em; color:var(--muted);
+         text-transform:uppercase; margin:0 0 12px; display:flex; align-items:center; gap:8px;}
+  .label::after{content:""; flex:1; height:1px; background:var(--line);}
+  .panel{background:linear-gradient(180deg,var(--surface-2),var(--surface)); border:1px solid var(--line);
+         border-radius:var(--radius); padding:18px; margin-bottom:16px;}
+
+  /* ---------- セットアップ ---------- */
+  .hero{padding:26px 0 22px;}
+  .hero h1{margin:0; font-family:var(--num); font-weight:700; font-size:clamp(44px,14vw,64px);
+           letter-spacing:.06em; line-height:.95;
+           background:linear-gradient(180deg,#fff 30%,#9fb3ab); -webkit-background-clip:text; background-clip:text; color:transparent;}
+  .hero h1 em{font-style:normal; background:linear-gradient(180deg,var(--gold),var(--gold-deep));
+              -webkit-background-clip:text; background-clip:text; color:transparent;}
+  .hero p{margin:12px 0 0; color:var(--muted); font-size:14px; line-height:1.7;}
+  .hero p b{color:var(--text);}
+
+  .field{display:flex; gap:8px;}
+  .field input{flex:1; min-width:0; height:50px; padding:0 16px; font-size:16px; color:var(--text);
+               background:var(--bg); border:1px solid var(--line-2); border-radius:14px; outline:none; transition:border-color .2s;}
+  .field input:focus{border-color:var(--felt);}
+  .field input::placeholder{color:var(--dim);}
+  .btn-add{height:50px; padding:0 18px; border-radius:14px; background:var(--surface-3);
+           border:1px solid var(--line-2); font-weight:700; font-size:15px;}
+
+  .roster{list-style:none; margin:14px 0 0; padding:0;}
+  .roster li{display:flex; align-items:center; gap:10px; padding:10px 10px 10px 12px; margin-bottom:8px;
+             background:var(--bg); border:1px solid var(--line); border-radius:14px; animation:rise .25s ease;}
+  .roster .ord{font-family:var(--num); font-weight:600; font-size:15px; width:28px; height:28px; flex:none;
+               border-radius:50%; display:grid; place-items:center; background:var(--surface-3); color:var(--gold);}
+  .roster .nm{flex:1; min-width:0; font-weight:700; font-size:16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .roster .ctl{width:34px; height:34px; border-radius:10px; display:grid; place-items:center; color:var(--muted);
+               background:var(--surface-2); flex:none;}
+  .roster .ctl:disabled{opacity:.25;}
+  .roster .ctl.del{color:var(--danger);}
+  .roster .ctl svg{width:16px; height:16px;}
+  .empty{color:var(--dim); font-size:13px; text-align:center; padding:18px 0 4px;}
+
+  .setting{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:4px 0;}
+  .setting .t{font-weight:700; font-size:15px;}
+  .setting .s{color:var(--muted); font-size:12px; margin-top:2px;}
+  .stepper{display:flex; align-items:center; background:var(--bg); border:1px solid var(--line-2); border-radius:14px; flex:none;}
+  .stepper button{width:42px; height:42px; font-size:22px; color:var(--muted);}
+  .stepper output{min-width:44px; text-align:center; font-family:var(--num); font-weight:600; font-size:20px; color:var(--danger);}
+
+  .btn-primary{width:100%; height:58px; border-radius:16px; font-weight:900; font-size:17px; letter-spacing:.08em;
+               color:#04140d; background:linear-gradient(180deg,#2fe39a,var(--felt) 55%,#0fa86b);
+               box-shadow:0 10px 30px -8px rgba(22,196,127,.6), inset 0 1px 0 rgba(255,255,255,.35);
+               transition:transform .1s, opacity .2s;}
+  .btn-primary:active{transform:scale(.98);}
+  .btn-primary:disabled{opacity:.3; box-shadow:none;}
+  .btn-ghost{width:100%; height:50px; border-radius:14px; font-weight:700; font-size:15px;
+             background:var(--surface-2); border:1px solid var(--line-2); margin-top:10px;}
+  .note{color:var(--dim); font-size:12px; text-align:center; margin:10px 0 0;}
+
+  /* ルール */
+  .rules{list-style:none; margin:0; padding:0; counter-reset:r;}
+  .rules li{position:relative; padding:0 0 14px 38px; font-size:14px; line-height:1.7; color:#cdd6d2; counter-increment:r;}
+  .rules li:last-child{padding-bottom:0;}
+  .rules li::before{content:counter(r,decimal-leading-zero); position:absolute; left:0; top:1px;
+                    font-family:var(--num); font-weight:600; font-size:14px; color:var(--gold); letter-spacing:.04em;}
+  .rules b{color:var(--text);}
+  .ex{display:inline-flex; align-items:center; gap:4px; font-family:var(--num); font-size:13px;
+      background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:1px 8px; margin:2px 0; white-space:nowrap;}
+  .ex .g{color:var(--gold);}
+
+  /* ---------- ゲーム ---------- */
+  .stage{position:relative; overflow:hidden; border-radius:22px; padding:20px 20px 18px; margin-bottom:16px;
+         border:1px solid rgba(22,196,127,.25);
+         background:
+           radial-gradient(120% 90% at 50% 0%, rgba(22,196,127,.22), transparent 65%),
+           linear-gradient(180deg,#0f1a16,#0b100f);}
+  .stage::before{content:""; position:absolute; inset:0; pointer-events:none; opacity:.35;
+                 background-image:radial-gradient(rgba(255,255,255,.05) 1px, transparent 1px); background-size:4px 4px;}
+  .stage > *{position:relative;}
+  .now{display:flex; align-items:flex-start; justify-content:space-between; gap:12px;}
+  .now .tag{font-family:var(--num); font-size:11px; letter-spacing:.24em; color:var(--felt);
+            display:flex; align-items:center; gap:6px;}
+  .now .tag::before{content:""; width:7px; height:7px; border-radius:50%; background:var(--felt);
+                    box-shadow:0 0 10px var(--felt); animation:pulse 1.6s infinite;}
+  .now .who{font-size:clamp(24px,7.5vw,32px); font-weight:900; margin-top:6px; line-height:1.15;
+            overflow-wrap:anywhere;}
+  .now .next{color:var(--muted); font-size:12px; margin-top:6px;}
+  .now .next b{color:#cdd6d2; font-weight:700;}
+  .score-big{text-align:right; flex:none; position:relative;}
+  .score-big .v{font-family:var(--num); font-weight:700; font-size:clamp(48px,15vw,64px); line-height:1; letter-spacing:-.01em;
+                font-variant-numeric:tabular-nums;}
+  .score-big .u{font-family:var(--num); font-size:11px; letter-spacing:.22em; color:var(--muted);}
+  .pop{position:absolute; right:0; top:-6px; font-family:var(--num); font-weight:700; font-size:22px;
+       color:var(--gold); opacity:0; pointer-events:none; text-shadow:0 0 18px rgba(242,193,78,.6);}
+  .pop.neg{color:var(--danger); text-shadow:0 0 18px rgba(255,79,96,.5);}
+  .pop.go{animation:popup 1s ease-out;}
+
+  .chain{margin-top:18px; display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:14px;
+         background:rgba(0,0,0,.35); border:1px solid var(--line); transition:border-color .3s, box-shadow .3s;}
+  .chain.on{border-color:rgba(242,193,78,.55); box-shadow:0 0 0 1px rgba(242,193,78,.15), 0 0 28px -6px rgba(242,193,78,.45);}
+  .chain .mul{font-family:var(--num); font-weight:700; font-size:28px; line-height:1; min-width:58px; color:var(--dim); letter-spacing:.02em;}
+  .chain.on .mul{color:var(--gold);}
+  .chain .txt{flex:1; min-width:0;}
+  .chain .h{font-family:var(--num); font-size:12px; letter-spacing:.2em; color:var(--muted);}
+  .chain.on .h{color:var(--gold);}
+  .chain .d{font-size:12px; color:var(--muted); margin-top:2px; line-height:1.5;}
+  .chain .mini-ball{width:34px; height:34px; flex:none;}
+
+  .rack{display:grid; grid-template-columns:repeat(5,1fr); gap:clamp(10px,3.4vw,16px); padding:4px 2px 2px;}
+
+  /* ボール */
+  .ball{position:relative; aspect-ratio:1; width:100%; border-radius:50%;}
+  .face{position:absolute; inset:0; border-radius:50%; overflow:hidden; transition:transform .15s, opacity .3s, filter .3s;
+        background:radial-gradient(circle at 50% 45%, var(--c) 0 55%, color-mix(in srgb, var(--c) 45%, #000) 100%);
+        box-shadow:0 8px 16px -4px rgba(0,0,0,.7), 0 2px 3px rgba(0,0,0,.5);}
+  .stripe .face{background:
+        linear-gradient(to bottom, #f4f0e6 0 23%, var(--c) 23% 77%, #f4f0e6 77%);}
+  .face::after{content:""; position:absolute; inset:0; border-radius:50%; z-index:2; pointer-events:none;
+        background:
+          radial-gradient(circle at 32% 24%, rgba(255,255,255,.85) 0, rgba(255,255,255,.25) 12%, transparent 30%),
+          radial-gradient(circle at 50% 50%, transparent 52%, rgba(0,0,0,.5) 100%);}
+  .face .n{position:absolute; inset:28%; border-radius:50%; background:#fbf9f3; z-index:1;
+           display:grid; place-items:center; font-family:var(--num); font-weight:600; color:#151515;
+           font-size:clamp(12px,3.9vw,18px); line-height:1; box-shadow:inset 0 -1px 2px rgba(0,0,0,.2);}
+  .ball:active .face{transform:scale(.9);}
+  .gain{position:absolute; left:50%; bottom:-9px; transform:translateX(-50%); z-index:3;
+        font-family:var(--num); font-weight:600; font-size:11px; letter-spacing:.02em; line-height:1;
+        padding:3px 7px; border-radius:999px; background:#0b100f; border:1px solid var(--line-2); color:var(--muted); white-space:nowrap;}
+  .gain.hot{background:var(--gold); border-color:var(--gold); color:#1d1402; box-shadow:0 0 12px rgba(242,193,78,.55);}
+  .ball.done{pointer-events:none;}
+  .ball.done .face{opacity:.09; filter:grayscale(1); transform:scale(.72);}
+  .ball.done .gain{opacity:0;}
+  .ball.sink .face{animation:sink .38s ease-in forwards;}
+
   /* スコアボード */
-  table.score{width:100%; border-collapse:collapse; font-size:15px;}
-  table.score td, table.score th{padding:7px 6px; border-bottom:1px solid #e3e8e4;}
-  table.score .pts{text-align:right; font-weight:800; font-size:17px;}
-  table.score tr.cur td{background:#fff6da;}
-  table.score tr.top td .pname{font-weight:800;}
-  .crown{font-size:13px;}
-  .log{font-size:12px; color:#66756b;}
-  /* 結果 */
-  .result{text-align:center;}
-  .result .win{font-size:22px; font-weight:800; margin:6px 0;}
-  .result .lose{font-size:15px; color:#a4133c; margin:2px 0 8px;}
-  .btn-again{width:100%; background:var(--felt); color:#fff; font-weight:800; padding:13px; margin-top:8px;}
-  .btn-tosetup{width:100%; background:#e7ece8; padding:11px; margin-top:8px;}
-  .hidden{display:none;}
-  .toast{position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(20px);
-         background:#14231a; color:#fff; padding:11px 20px; border-radius:999px; font-size:15px;
-         opacity:0; pointer-events:none; transition:.25s; max-width:92vw; text-align:center; z-index:9;}
-  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  .board{list-style:none; margin:0; padding:0;}
+  .board li{position:relative; overflow:hidden; display:flex; align-items:center; gap:12px; padding:12px 14px;
+            border-radius:14px; background:var(--bg); border:1px solid var(--line); margin-bottom:8px;}
+  .board li:last-child{margin-bottom:0;}
+  .board li.cur{border-color:rgba(22,196,127,.5); background:linear-gradient(90deg,rgba(22,196,127,.10),var(--bg) 70%);}
+  .board .bar{position:absolute; left:0; bottom:0; height:2px; background:linear-gradient(90deg,var(--felt),transparent); transition:width .5s;}
+  .board .rk{font-family:var(--num); font-weight:600; font-size:16px; width:22px; color:var(--dim); text-align:center;}
+  .board li.first .rk{color:var(--gold);}
+  .board .nm{flex:1; min-width:0; font-weight:700; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .board .nm small{display:inline-block; margin-left:8px; font-size:10px; font-weight:700; letter-spacing:.1em;
+                   color:var(--felt); border:1px solid rgba(22,196,127,.4); border-radius:999px; padding:1px 7px; vertical-align:2px;}
+  .board .sc{font-family:var(--num); font-weight:600; font-size:22px; font-variant-numeric:tabular-nums;}
+  .board .sc.neg{color:var(--danger);}
+
+  /* 下部アクションバー */
+  .dock{position:fixed; left:0; right:0; bottom:0; z-index:6; padding:12px 0 calc(12px + env(safe-area-inset-bottom));
+        background:linear-gradient(180deg,rgba(7,9,10,0),rgba(7,9,10,.92) 30%); }
+  .dock .wrap{display:grid; grid-template-columns:58px 1fr 1fr; gap:10px;}
+  .dock button{height:60px; border-radius:16px; font-weight:900; font-size:16px; letter-spacing:.04em;
+               display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; transition:transform .1s;}
+  .dock button:active{transform:scale(.97);}
+  .dock button small{font-family:var(--num); font-weight:500; font-size:10px; letter-spacing:.2em; opacity:.7;}
+  .b-undo{background:var(--surface-2); border:1px solid var(--line-2); color:var(--muted);}
+  .b-undo svg{width:22px; height:22px;}
+  .b-miss{background:linear-gradient(180deg,#46544f,#333f3b); border:1px solid rgba(255,255,255,.1);
+          box-shadow:inset 0 1px 0 rgba(255,255,255,.12);}
+  .b-foul{background:linear-gradient(180deg,#ff6b79,var(--danger) 55%,#d63446); color:#fff;
+          box-shadow:0 10px 26px -10px rgba(255,79,96,.7), inset 0 1px 0 rgba(255,255,255,.3);}
+  #game{padding-bottom:96px;}
+
+  /* ---------- 結果 ---------- */
+  .champ{text-align:center; padding:30px 20px 26px; border-radius:22px; margin-bottom:16px; position:relative; overflow:hidden;
+         border:1px solid rgba(242,193,78,.35);
+         background:radial-gradient(100% 80% at 50% 0%, rgba(242,193,78,.22), transparent 70%), linear-gradient(180deg,#17140c,#0c0c0a);}
+  .champ .k{font-family:var(--num); font-size:12px; letter-spacing:.3em; color:var(--gold);}
+  .champ .crown{font-size:40px; margin:14px 0 4px; filter:drop-shadow(0 6px 16px rgba(242,193,78,.5));}
+  .champ .w{font-size:clamp(28px,9vw,38px); font-weight:900; overflow-wrap:anywhere;}
+  .champ .p{font-family:var(--num); font-weight:700; font-size:56px; line-height:1.05; color:var(--gold);}
+  .champ .p span{font-size:16px; letter-spacing:.2em; color:var(--muted); margin-left:6px;}
+  .final li{flex-wrap:wrap;}
+  .final .lg{flex-basis:100%; display:flex; flex-wrap:wrap; gap:5px; padding-left:34px;}
+  .final .lg span{font-family:var(--num); font-size:11px; color:var(--muted); background:var(--surface-2);
+                  border-radius:6px; padding:2px 6px;}
+  .final .lg span.f{color:var(--danger);}
+  .final .last-tag{font-size:10px; font-weight:700; letter-spacing:.1em; color:var(--danger);
+                   border:1px solid rgba(255,79,96,.4); border-radius:999px; padding:1px 7px; margin-left:8px; vertical-align:2px;}
+
+  /* ---------- シート ---------- */
+  .scrim{position:fixed; inset:0; z-index:20; background:rgba(0,0,0,.6); opacity:0; pointer-events:none; transition:opacity .25s;}
+  .scrim.open{opacity:1; pointer-events:auto;}
+  .sheet{position:fixed; left:0; right:0; bottom:0; z-index:21; max-height:86vh; overflow:auto;
+         transform:translateY(105%); transition:transform .32s cubic-bezier(.2,.8,.2,1);
+         background:var(--surface); border-top:1px solid var(--line-2); border-radius:24px 24px 0 0;
+         padding:10px 0 calc(24px + env(safe-area-inset-bottom));}
+  .sheet.open{transform:none;}
+  .sheet .grip{width:40px; height:4px; border-radius:2px; background:var(--line-2); margin:0 auto 18px;}
+  .sheet h3{margin:0 0 16px; font-size:18px; font-weight:900;}
+  .sheet .sec{margin-top:22px;}
+  .btn-danger-outline{width:100%; height:50px; border-radius:14px; font-weight:700; font-size:15px; margin-top:10px;
+                      color:var(--danger); border:1px solid rgba(255,79,96,.4); background:rgba(255,79,96,.06);}
+  .btn-danger-outline.arm{background:var(--danger); color:#fff;}
+
+  /* トースト */
+  .toast{position:fixed; left:50%; bottom:calc(96px + env(safe-area-inset-bottom)); z-index:30;
+         transform:translate(-50%,12px); opacity:0; pointer-events:none; transition:.25s;
+         background:rgba(30,39,36,.96); border:1px solid var(--line-2); backdrop-filter:blur(10px);
+         padding:11px 18px; border-radius:999px; font-size:14px; font-weight:500; max-width:calc(100vw - 32px);
+         text-align:center; box-shadow:0 10px 30px rgba(0,0,0,.5);}
+  .toast.show{opacity:1; transform:translate(-50%,0);}
+  body.no-dock .toast{bottom:calc(24px + env(safe-area-inset-bottom));}
+
+  @keyframes rise{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;}}
+  @keyframes pulse{50%{opacity:.35;}}
+  @keyframes popup{0%{opacity:0; transform:translateY(8px) scale(.8);} 15%{opacity:1; transform:translateY(0) scale(1.1);} 70%{opacity:1;} 100%{opacity:0; transform:translateY(-26px);}}
+  @keyframes sink{to{transform:scale(.3); opacity:0;}}
+  @media (prefers-reduced-motion: reduce){ *{animation:none !important; transition:none !important;} }
 </style>
 </head>
-<body>
-<header>
-  <h1>🎱 チェーン・ビリヤード</h1>
-  <p>連続で入れると前の球と掛け算！ 一番高い人が勝ち</p>
+<body class="no-dock">
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand">
+      <div class="mark"><i></i><i></i></div>
+      <div class="wordmark">CHAIN BALL<small>チェーンボール</small></div>
+    </div>
+    <span class="chip hidden" id="remainChip">残り <b id="remainNum">15</b></span>
+    <button class="icon-btn" id="menuBtn" aria-label="メニュー">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+  </div>
 </header>
-<main>
+
+<main class="wrap">
 
   <!-- セットアップ -->
   <section id="setup">
-    <div class="card">
-      <h2>プレイヤー名簿</h2>
-      <div class="addrow">
-        <input id="nameInput" type="text" placeholder="名前を入力" autocomplete="off">
+    <div class="hero">
+      <h1>CHAIN<br><em>BALL</em></h1>
+      <p>連続で沈めるほど点数が<b>掛け算</b>で跳ね上がる、<br>新しいビリヤードゲーム。</p>
+    </div>
+
+    <div class="panel">
+      <p class="label">Players</p>
+      <div class="field">
+        <input id="nameInput" type="text" placeholder="プレイヤー名を入力" autocomplete="off" enterkeyhint="done" maxlength="20">
         <button class="btn-add" id="addBtn">追加</button>
       </div>
       <ul class="roster" id="rosterList"></ul>
-      <p class="hint">2人以上でスタートできます。並び順がそのままターンの順番です（↑↓で入れ替え）。</p>
-      <div class="addrow" style="margin-top:10px; align-items:center;">
-        <label for="foulSetup" style="font-size:14px;">ファウル点数（マイナス）</label>
-        <input id="foulSetup" type="number" min="0" max="99" value="2" style="flex:none; width:76px; text-align:center;">
-        <span style="font-size:14px;">点</span>
-      </div>
-      <button class="btn-start" id="startBtn" disabled>ゲームスタート</button>
+      <p class="empty" id="rosterEmpty">2人以上でスタートできます。並び順がターンの順番です。</p>
     </div>
-    <div class="card">
-      <h2>ルール</h2>
-      <p class="hint" style="margin-top:0">
-        ・球は1〜15番全部を使う。落とした球は戻らない<br>
-        ・1つ目の球はそのままの点数（例：2番 → +2点）<br>
-        ・同じプレイヤーが連続で入れると「前の球 × 今の球」が点数（例：2の次に6 → +12点、その次に5 → +30点）<br>
-        ・ただし掛け算は1桁同士の時だけ。2桁の球（10〜15番）は掛け算されず、そのままの点数（例：4の次に11 → +11点）。2桁を入れた後はチェーンもリセット<br>
-        ・外したらターン交代（ペナルティなし）<br>
-        ・ファウル（手玉を落とす／どの球にも当たらない）はマイナス点（デフォルト −2点、設定で変更可）＆ターン交代<br>
-        ・15個全部落ちたら終了。一番点数が高い人が勝ち、低い人が負け
-      </p>
+
+    <div class="panel">
+      <p class="label">Settings</p>
+      <div class="setting">
+        <div><div class="t">ファウルのペナルティ</div><div class="s">手玉を落とす／どの球にも当たらない</div></div>
+        <div class="stepper">
+          <button data-step="-1" aria-label="減らす">−</button>
+          <output id="foulSetupVal">−2</output>
+          <button data-step="1" aria-label="増やす">＋</button>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-primary" id="startBtn" disabled>GAME START</button>
+    <p class="note">途中の状態は自動保存。閉じても続きから再開できます。</p>
+
+    <div class="panel" style="margin-top:24px">
+      <p class="label">How to play</p>
+      <ol class="rules" id="rulesSetup"></ol>
     </div>
   </section>
 
   <!-- ゲーム -->
   <section id="game" class="hidden">
-    <div class="card">
-      <div class="turn-banner">
-        <div><span class="who" id="turnName"></span> のターン</div>
-        <div class="chain" id="chainInfo"></div>
+    <div class="stage">
+      <div class="now">
+        <div style="min-width:0">
+          <div class="tag">NOW PLAYING</div>
+          <div class="who" id="turnName"></div>
+          <div class="next" id="nextName"></div>
+        </div>
+        <div class="score-big">
+          <div class="v" id="turnScore">0</div>
+          <div class="u">POINTS</div>
+          <div class="pop" id="pop"></div>
+        </div>
       </div>
-      <div class="balls" id="ballGrid"></div>
+      <div class="chain" id="chain">
+        <div class="mul" id="chainMul">×1</div>
+        <div class="txt"><div class="h" id="chainHead"></div><div class="d" id="chainDesc"></div></div>
+        <div class="mini-ball" id="chainBall"></div>
+      </div>
     </div>
-    <div class="card">
-      <div class="actions">
-        <button class="btn-miss" id="missBtn">外した（交代）</button>
-        <button class="btn-foul" id="foulBtn">ファウル −2点</button>
-      </div>
-      <div class="addrow" style="margin-top:10px; align-items:center;">
-        <label for="foulGame" style="font-size:13px; color:#66756b;">ファウル点数の変更（マイナス）</label>
-        <input id="foulGame" type="number" min="0" max="99" value="2" style="flex:none; width:70px; text-align:center; font-size:15px; padding:7px; border:2px solid #cfd8d2; border-radius:8px;">
-        <span style="font-size:13px; color:#66756b;">点</span>
-      </div>
-      <button class="btn-undo" id="undoBtn">↩ ひとつ戻す</button>
+
+    <div class="panel">
+      <p class="label">Tap the pocketed ball</p>
+      <div class="rack" id="ballGrid"></div>
+      <div style="height:10px"></div>
     </div>
-    <div class="card">
-      <h2>スコアボード</h2>
-      <table class="score"><tbody id="scoreBody"></tbody></table>
-      <p class="log" id="lastLog"></p>
+
+    <div class="panel">
+      <p class="label">Leaderboard</p>
+      <ul class="board" id="scoreBody"></ul>
     </div>
   </section>
 
   <!-- 結果 -->
   <section id="result" class="hidden">
-    <div class="card result">
-      <h2>🏆 結果発表</h2>
-      <div class="win" id="winnerLine"></div>
-      <div class="lose" id="loserLine"></div>
-      <table class="score"><tbody id="finalBody"></tbody></table>
-      <button class="btn-again" id="againBtn">同じメンバーでもう一度</button>
-      <button class="btn-tosetup" id="backBtn">名簿に戻る</button>
+    <div class="champ">
+      <div class="k">GAME OVER · WINNER</div>
+      <div class="crown">👑</div>
+      <div class="w" id="winnerName"></div>
+      <div class="p" id="winnerScore"></div>
     </div>
+    <div class="panel">
+      <p class="label">Final standings</p>
+      <ul class="board final" id="finalBody"></ul>
+    </div>
+    <button class="btn-primary" id="againBtn">同じメンバーでもう一度</button>
+    <button class="btn-ghost" id="backBtn">名簿に戻る</button>
   </section>
 
 </main>
+
+<div class="dock hidden" id="dock">
+  <div class="wrap">
+    <button class="b-undo" id="undoBtn" aria-label="ひとつ戻す">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>
+    </button>
+    <button class="b-miss" id="missBtn">外した<small>NEXT PLAYER</small></button>
+    <button class="b-foul" id="foulBtn"><span id="foulLabel">ファウル −2</span><small>FOUL</small></button>
+  </div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet">
+  <div class="wrap">
+    <div class="grip"></div>
+    <h3>メニュー</h3>
+    <div id="sheetGameOnly">
+      <p class="label">Settings</p>
+      <div class="setting">
+        <div><div class="t">ファウルのペナルティ</div><div class="s">変更はこの後のファウルから反映</div></div>
+        <div class="stepper" id="foulGameStepper">
+          <button data-step="-1" aria-label="減らす">−</button>
+          <output id="foulGameVal">−2</output>
+          <button data-step="1" aria-label="増やす">＋</button>
+        </div>
+      </div>
+    </div>
+    <div class="sec">
+      <p class="label">How to play</p>
+      <ol class="rules" id="rulesSheet"></ol>
+    </div>
+    <div class="sec" id="quitWrap">
+      <button class="btn-danger-outline" id="quitBtn">ゲームをやめて名簿に戻る</button>
+    </div>
+    <button class="btn-ghost" id="closeSheet">閉じる</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
 "use strict";
-var BALL_COLORS = {1:"#f7d038",2:"#2456c8",3:"#e33224",4:"#5b2d90",5:"#f07d18",
-  6:"#0b7a43",7:"#8c2f1b",8:"#191919",9:"#f7d038",10:"#2456c8",11:"#e33224",
-  12:"#5b2d90",13:"#f07d18",14:"#0b7a43",15:"#8c2f1b"};
+var BALL_COLORS = {1:"#f5c518",2:"#1f4fc4",3:"#d9262c",4:"#5a2a91",5:"#f0721a",
+  6:"#0d7a45",7:"#8a2b18",8:"#1a1a1a",9:"#f5c518",10:"#1f4fc4",11:"#d9262c",
+  12:"#5a2a91",13:"#f0721a",14:"#0d7a45",15:"#8a2b18"};
 var LS_KEY = "chain-billiards-v1";
+var RULES = [
+  "球は<b>1〜15番</b>を全部使う。落とした球はテーブルに戻らない",
+  "1つ目の球はそのままの点数 <span class='ex'>2番 → <span class='g'>+2</span></span>",
+  "同じプレイヤーが連続で入れると<b>「前の球 × 今の球」</b> <span class='ex'>2 → 6 = <span class='g'>+12</span></span> <span class='ex'>→ 5 = <span class='g'>+30</span></span>",
+  "掛け算は<b>1桁同士だけ</b>。10〜15番はそのままの点数で、入れた後はチェーンもリセット <span class='ex'>4 → 11 = <span class='g'>+11</span></span>",
+  "外したらターン交代（ペナルティなし）",
+  "ファウル（手玉を落とす／どの球にも当たらない）は<b>マイナス点</b>＆ターン交代",
+  "15個全部落ちたら終了。最高点が勝ち、最低点が負け"
+];
+var $ = function(id){ return document.getElementById(id); };
 
 var state = null;
 function freshState(players, foulPenalty){
@@ -177,45 +433,77 @@ function freshState(players, foulPenalty){
 function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){} }
 function load(){ try{ var s = localStorage.getItem(LS_KEY); return s ? JSON.parse(s) : null; }catch(e){ return null; } }
 function clearSave(){ try{ localStorage.removeItem(LS_KEY); }catch(e){} }
+function foulPts(){ return (state && typeof state.foulPenalty === "number") ? state.foulPenalty : 2; }
+function buzz(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(e){} }
+function esc(s){ var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+function ballEl(n, tag){
+  var b = document.createElement(tag || "div");
+  b.className = "ball " + (n >= 9 ? "stripe" : "solid");
+  b.style.setProperty("--c", BALL_COLORS[n]);
+  b.innerHTML = '<span class="face"><span class="n">' + n + "</span></span>";
+  return b;
+}
+["rulesSetup","rulesSheet"].forEach(function(id){
+  $(id).innerHTML = RULES.map(function(r){ return "<li>" + r + "</li>"; }).join("");
+});
+
+/* ---------- 画面切り替え ---------- */
+function showScreen(name){
+  ["setup","game","result"].forEach(function(s){ $(s).classList.toggle("hidden", s !== name); });
+  $("dock").classList.toggle("hidden", name !== "game");
+  document.body.classList.toggle("no-dock", name !== "game");
+  $("remainChip").classList.toggle("hidden", name !== "game");
+  $("sheetGameOnly").classList.toggle("hidden", name !== "game");
+  $("quitWrap").classList.toggle("hidden", name !== "game");
+  window.scrollTo(0, 0);
+}
 
 /* ---------- セットアップ ---------- */
 var roster = [];
-var nameInput = document.getElementById("nameInput");
+var setupFoul = 2;
+var ICON_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>';
+var ICON_DN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
+var ICON_X  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+var nameInput = $("nameInput");
 function renderRoster(){
-  var ul = document.getElementById("rosterList");
+  var ul = $("rosterList");
   ul.innerHTML = "";
   roster.forEach(function(name, i){
     var li = document.createElement("li");
-    li.innerHTML = '<span class="num"></span><span class="sp"></span>';
-    li.querySelector(".num").textContent = i + 1;
-    li.querySelector(".sp").textContent = name;
-    var up = document.createElement("button"); up.className = "mini"; up.textContent = "↑";
-    up.onclick = function(){ if(i>0){ var t=roster[i-1]; roster[i-1]=roster[i]; roster[i]=t; renderRoster(); } };
-    var dn = document.createElement("button"); dn.className = "mini"; dn.textContent = "↓";
-    dn.onclick = function(){ if(i<roster.length-1){ var t=roster[i+1]; roster[i+1]=roster[i]; roster[i]=t; renderRoster(); } };
-    var del = document.createElement("button"); del.className = "mini del"; del.textContent = "削除";
-    del.onclick = function(){ roster.splice(i,1); renderRoster(); };
-    li.appendChild(up); li.appendChild(dn); li.appendChild(del);
+    li.innerHTML = '<span class="ord">' + (i + 1) + '</span><span class="nm">' + esc(name) + "</span>" +
+      '<button class="ctl" data-a="up"' + (i === 0 ? " disabled" : "") + ' aria-label="上へ">' + ICON_UP + "</button>" +
+      '<button class="ctl" data-a="dn"' + (i === roster.length - 1 ? " disabled" : "") + ' aria-label="下へ">' + ICON_DN + "</button>" +
+      '<button class="ctl del" data-a="del" aria-label="削除">' + ICON_X + "</button>";
+    li.querySelector('[data-a="up"]').onclick = function(){ var t=roster[i-1]; roster[i-1]=roster[i]; roster[i]=t; renderRoster(); };
+    li.querySelector('[data-a="dn"]').onclick = function(){ var t=roster[i+1]; roster[i+1]=roster[i]; roster[i]=t; renderRoster(); };
+    li.querySelector('[data-a="del"]').onclick = function(){ roster.splice(i,1); renderRoster(); };
     ul.appendChild(li);
   });
-  document.getElementById("startBtn").disabled = roster.length < 2;
+  $("rosterEmpty").classList.toggle("hidden", roster.length >= 2);
+  $("rosterEmpty").textContent = roster.length === 1 ? "あと1人追加するとスタートできます。" :
+    "2人以上でスタートできます。並び順がターンの順番です。";
+  $("startBtn").disabled = roster.length < 2;
+  $("foulSetupVal").textContent = "−" + setupFoul;
 }
 function addPlayer(){
   var v = nameInput.value.trim();
   if(!v) return;
   roster.push(v); nameInput.value = ""; nameInput.focus(); renderRoster();
 }
-document.getElementById("addBtn").onclick = addPlayer;
-nameInput.addEventListener("keydown", function(e){ if(e.key === "Enter") addPlayer(); });
-document.getElementById("startBtn").onclick = function(){
-  var fp = parseInt(document.getElementById("foulSetup").value, 10);
-  if(isNaN(fp) || fp < 0) fp = 2;
-  state = freshState(roster.slice(), fp);
+$("addBtn").onclick = addPlayer;
+nameInput.addEventListener("keydown", function(e){ if(e.key === "Enter" && !e.isComposing) addPlayer(); });
+Array.prototype.forEach.call(document.querySelectorAll("#setup .stepper button"), function(b){
+  b.onclick = function(){ setupFoul = Math.max(0, Math.min(99, setupFoul + Number(b.dataset.step))); renderRoster(); };
+});
+$("startBtn").onclick = function(){
+  state = freshState(roster.slice(), setupFoul);
   save(); showGame(); toast("ゲームスタート！ " + state.players[0].name + " から");
 };
 
 /* ---------- ゲーム ---------- */
 function cur(){ return state.players[state.current]; }
+function ptsFor(n){ return (state.lastBall !== null && state.lastBall <= 9 && n <= 9) ? state.lastBall * n : n; }
 function snapshot(){
   state.history.push(JSON.stringify({ players: state.players, current: state.current,
     lastBall: state.lastBall, pocketed: state.pocketed, finished: state.finished,
@@ -223,37 +511,59 @@ function snapshot(){
   if(state.history.length > 200) state.history.shift();
 }
 function toast(msg){
-  var t = document.getElementById("toast");
+  var t = $("toast");
   t.textContent = msg; t.classList.add("show");
-  clearTimeout(t._tm); t._tm = setTimeout(function(){ t.classList.remove("show"); }, 2100);
+  clearTimeout(t._tm); t._tm = setTimeout(function(){ t.classList.remove("show"); }, 2000);
+}
+function pop(text, neg){
+  var p = $("pop");
+  p.textContent = text; p.classList.toggle("neg", !!neg);
+  p.classList.remove("go"); void p.offsetWidth; p.classList.add("go");
+}
+$("pop").addEventListener("animationend", function(){ this.classList.remove("go"); });
+var shownScore = 0, scoreRaf = 0;
+function animateScore(to, instant){
+  cancelAnimationFrame(scoreRaf);
+  var el = $("turnScore"), from = shownScore, t0 = performance.now(), dur = 450;
+  if(instant || from === to){ shownScore = to; el.textContent = to; return; }
+  (function step(t){
+    var k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+    shownScore = Math.round(from + (to - from) * e); el.textContent = shownScore;
+    if(k < 1) scoreRaf = requestAnimationFrame(step);
+  })(t0);
 }
 function buildBalls(){
-  var grid = document.getElementById("ballGrid");
+  var grid = $("ballGrid");
   grid.innerHTML = "";
   for(var n = 1; n <= 15; n++){
     (function(n){
-      var b = document.createElement("button");
-      b.className = "ball " + (n >= 9 ? "striped" : "solid");
-      b.style.setProperty("--c", BALL_COLORS[n]);
-      b.innerHTML = '<span class="n">' + n + "</span>";
+      var b = ballEl(n, "button");
+      b.setAttribute("aria-label", n + "番");
       b.dataset.ball = n;
-      b.onclick = function(){ pocket(n); };
+      var g = document.createElement("span"); g.className = "gain"; b.appendChild(g);
+      b.onclick = function(){ pocket(n, b); };
       grid.appendChild(b);
     })(n);
   }
 }
-function pocket(n){
+function pocket(n, el){
   if(state.finished || state.pocketed.indexOf(n) >= 0) return;
   snapshot();
   var p = cur();
-  var pts = (state.lastBall !== null && state.lastBall <= 9 && n <= 9) ? state.lastBall * n : n;
+  var pts = ptsFor(n);
   p.score += pts;
   p.log.push(n + "番(+" + pts + ")");
   state.pocketed.push(n);
   state.lastBall = n;
-  if(state.pocketed.length >= 15){ state.finished = true; save(); render(); showResult(); return; }
-  save(); render();
-  toast(p.name + "：" + n + "番 +" + pts + "点！ 続けてどうぞ");
+  buzz(pts > n ? [12, 40, 18] : 12);
+  if(state.pocketed.length >= 15) state.finished = true;
+  if(el){ el.classList.add("sink"); }
+  save();
+  setTimeout(function(){
+    if(el) el.classList.remove("sink");
+    render(); pop("+" + pts);
+    if(state.finished) setTimeout(showResult, 900);
+  }, el ? 340 : 0);
 }
 function nextPlayer(){
   state.current = (state.current + 1) % state.players.length;
@@ -261,16 +571,16 @@ function nextPlayer(){
 }
 function miss(){
   if(state.finished) return;
-  snapshot(); nextPlayer(); save(); render();
+  snapshot(); nextPlayer(); save(); render(true); buzz(8);
   toast("交代 → " + cur().name + " のターン");
 }
 function foul(){
   if(state.finished) return;
   snapshot();
-  var fp = (typeof state.foulPenalty === "number") ? state.foulPenalty : 2;
+  var fp = foulPts();
   var p = cur(); p.score -= fp; p.log.push("ファウル(-" + fp + ")");
-  nextPlayer(); save(); render();
-  toast(p.name + " ファウル −" + fp + "点。交代 → " + cur().name);
+  nextPlayer(); save(); render(true); buzz([30, 50, 30]);
+  toast(p.name + " ファウル −" + fp + "点 → " + cur().name + " のターン");
 }
 function undo(){
   if(!state.history.length){ toast("戻せる操作がありません"); return; }
@@ -278,102 +588,138 @@ function undo(){
   state.players = s.players; state.current = s.current; state.lastBall = s.lastBall;
   state.pocketed = s.pocketed; state.finished = s.finished;
   if(typeof s.foulPenalty === "number") state.foulPenalty = s.foulPenalty;
-  save(); render(); toast("ひとつ戻しました");
+  save(); render(true); toast("ひとつ戻しました");
 }
-document.getElementById("missBtn").onclick = miss;
-document.getElementById("foulBtn").onclick = foul;
-document.getElementById("undoBtn").onclick = undo;
+$("missBtn").onclick = miss;
+$("foulBtn").onclick = foul;
+$("undoBtn").onclick = undo;
 
-function render(){
-  document.getElementById("turnName").textContent = cur().name;
-  var ci = document.getElementById("chainInfo");
-  if(state.lastBall === null){
-    ci.innerHTML = "チェーンなし：次の球はそのままの点数";
-  } else if(state.lastBall <= 9){
-    ci.innerHTML = "前の球は <b>" + state.lastBall + "番</b>：次に1桁の球を入れると ×" + state.lastBall + " 倍！（2桁の球はそのままの点数）";
+function render(instant){
+  var p = cur();
+  $("turnName").textContent = p.name;
+  var nxt = state.players[(state.current + 1) % state.players.length];
+  $("nextName").innerHTML = "次は <b>" + esc(nxt.name) + "</b>";
+  animateScore(p.score, instant);
+
+  var lb = state.lastBall, chain = $("chain"), mb = $("chainBall");
+  mb.innerHTML = "";
+  if(lb === null){
+    chain.classList.remove("on");
+    $("chainMul").textContent = "×1";
+    $("chainHead").textContent = "NO CHAIN";
+    $("chainDesc").textContent = "次の球はそのままの点数";
+  } else if(lb <= 9){
+    chain.classList.add("on");
+    $("chainMul").textContent = "×" + lb;
+    $("chainHead").textContent = "CHAIN ACTIVE";
+    $("chainDesc").textContent = "1桁の球を沈めると ×" + lb + "。2桁はそのまま";
+    mb.appendChild(ballEl(lb));
   } else {
-    ci.innerHTML = "前の球は <b>" + state.lastBall + "番</b>（2桁）：次の球はそのままの点数。1桁を入れればチェーン開始";
+    chain.classList.remove("on");
+    $("chainMul").textContent = "×1";
+    $("chainHead").textContent = "CHAIN RESET";
+    $("chainDesc").textContent = "2桁の後はそのまま。1桁を入れればチェーン開始";
+    mb.appendChild(ballEl(lb));
   }
-  var fpNow = (typeof state.foulPenalty === "number") ? state.foulPenalty : 2;
-  document.getElementById("foulBtn").textContent = "ファウル −" + fpNow + "点";
-  var fg = document.getElementById("foulGame");
-  if(document.activeElement !== fg) fg.value = fpNow;
-  var grid = document.getElementById("ballGrid");
-  Array.prototype.forEach.call(grid.children, function(b){
-    if(state.pocketed.indexOf(Number(b.dataset.ball)) >= 0) b.classList.add("done");
-    else b.classList.remove("done");
+
+  $("foulLabel").textContent = "ファウル −" + foulPts();
+  $("foulGameVal").textContent = "−" + foulPts();
+  $("remainNum").textContent = 15 - state.pocketed.length;
+
+  Array.prototype.forEach.call($("ballGrid").children, function(b){
+    var n = Number(b.dataset.ball), done = state.pocketed.indexOf(n) >= 0;
+    b.classList.toggle("done", done);
+    var g = b.querySelector(".gain"), v = ptsFor(n);
+    g.textContent = "+" + v;
+    g.classList.toggle("hot", v > n);
   });
-  renderScore(document.getElementById("scoreBody"), false);
-  var last = state.history.length ? "残りの球：" + (15 - state.pocketed.length) + "個" : "残りの球：15個";
-  document.getElementById("lastLog").textContent = last;
+  renderBoard($("scoreBody"), false);
 }
 function sortedPlayers(){
   return state.players.map(function(p, i){ return {p: p, i: i}; })
     .sort(function(a, b){ return b.p.score - a.p.score; });
 }
-function renderScore(tbody, final){
-  tbody.innerHTML = "";
-  sortedPlayers().forEach(function(e, rank){
-    var tr = document.createElement("tr");
-    if(!final && e.i === state.current) tr.className = "cur";
-    if(rank === 0) tr.classList.add("top");
-    var name = (rank === 0 ? "👑 " : "") + e.p.name + (!final && e.i === state.current ? "（プレイ中）" : "");
-    tr.innerHTML = "<td class='pname'></td><td class='pts'></td>";
-    tr.querySelector(".pname").textContent = name;
-    tr.querySelector(".pts").textContent = e.p.score + "点";
-    tbody.appendChild(tr);
+function renderBoard(ul, final){
+  ul.innerHTML = "";
+  var list = sortedPlayers();
+  var max = Math.max(1, list[0].p.score);
+  list.forEach(function(e, rank){
+    var li = document.createElement("li");
+    var isCur = !final && e.i === state.current;
+    var isLast = final && rank === list.length - 1 && list.length > 1;
+    if(isCur) li.classList.add("cur");
+    if(rank === 0) li.classList.add("first");
+    var html = '<span class="rk">' + (rank + 1) + '</span><span class="nm">' + esc(e.p.name) +
+      (isCur ? "<small>PLAYING</small>" : "") + (isLast ? '<span class="last-tag">最下位</span>' : "") + "</span>" +
+      '<span class="sc' + (e.p.score < 0 ? " neg" : "") + '">' + e.p.score + "</span>" +
+      '<i class="bar" style="width:' + Math.max(0, e.p.score / max * 100) + '%"></i>';
     if(final){
-      var tr2 = document.createElement("tr");
-      tr2.innerHTML = "<td colspan='2' class='log'></td>";
-      tr2.querySelector(".log").textContent = e.p.log.join("、") || "記録なし";
-      tbody.appendChild(tr2);
+      html += '<div class="lg">' + (e.p.log.length ? e.p.log.map(function(l){
+        return '<span' + (l.indexOf("ファウル") === 0 ? ' class="f"' : "") + ">" + esc(l) + "</span>";
+      }).join("") : "<span>記録なし</span>") + "</div>";
     }
+    li.innerHTML = html;
+    ul.appendChild(li);
   });
 }
 function showGame(){
-  document.getElementById("setup").classList.add("hidden");
-  document.getElementById("result").classList.add("hidden");
-  document.getElementById("game").classList.remove("hidden");
-  buildBalls(); render();
+  showScreen("game");
+  $("pop").classList.remove("go");
+  buildBalls(); render(true);
 }
 function showResult(){
-  document.getElementById("game").classList.add("hidden");
-  document.getElementById("result").classList.remove("hidden");
+  showScreen("result");
   var s = sortedPlayers();
-  document.getElementById("winnerLine").textContent = "勝ち： " + s[0].p.name + "（" + s[0].p.score + "点）";
-  var lastP = s[s.length - 1].p;
-  document.getElementById("loserLine").textContent = "最下位： " + lastP.name + "（" + lastP.score + "点）";
-  renderScore(document.getElementById("finalBody"), true);
-  toast("ゲーム終了！");
+  $("winnerName").textContent = s[0].p.name;
+  $("winnerScore").innerHTML = s[0].p.score + "<span>PTS</span>";
+  renderBoard($("finalBody"), true);
+  buzz([20, 60, 20, 60, 40]);
 }
-document.getElementById("againBtn").onclick = function(){
-  var names = state.players.map(function(p){ return p.name; });
-  var fp = (typeof state.foulPenalty === "number") ? state.foulPenalty : 2;
-  state = freshState(names, fp); save(); showGame(); toast("新しいゲーム！ " + names[0] + " から");
-};
-document.getElementById("foulGame").addEventListener("change", function(){
-  if(!state) return;
-  var v = parseInt(this.value, 10);
-  if(isNaN(v) || v < 0) v = 2;
-  state.foulPenalty = v; save(); render();
-  toast("ファウル点数を −" + v + "点に変更しました");
-});
-document.getElementById("backBtn").onclick = function(){
+function backToSetup(){
   clearSave(); state = null;
-  document.getElementById("result").classList.add("hidden");
-  document.getElementById("game").classList.add("hidden");
-  document.getElementById("setup").classList.remove("hidden");
+  showScreen("setup");
   renderRoster();
+}
+$("againBtn").onclick = function(){
+  var names = state.players.map(function(p){ return p.name; });
+  state = freshState(names, foulPts()); save(); showGame(); toast("新しいゲーム！ " + names[0] + " から");
+};
+$("backBtn").onclick = backToSetup;
+
+/* ---------- メニュー ---------- */
+function openSheet(){ $("scrim").classList.add("open"); $("sheet").classList.add("open"); }
+function closeSheet(){
+  $("scrim").classList.remove("open"); $("sheet").classList.remove("open");
+  var q = $("quitBtn"); q.classList.remove("arm"); q.textContent = "ゲームをやめて名簿に戻る";
+}
+$("menuBtn").onclick = openSheet;
+$("scrim").onclick = closeSheet;
+$("closeSheet").onclick = closeSheet;
+Array.prototype.forEach.call(document.querySelectorAll("#foulGameStepper button"), function(b){
+  b.onclick = function(){
+    if(!state) return;
+    state.foulPenalty = Math.max(0, Math.min(99, foulPts() + Number(b.dataset.step)));
+    save(); render(true);
+  };
+});
+$("quitBtn").onclick = function(){
+  var q = this;
+  if(!q.classList.contains("arm")){ q.classList.add("arm"); q.textContent = "もう一度タップで確定（スコアは消えます）"; return; }
+  roster = state.players.map(function(p){ return p.name; });
+  setupFoul = foulPts();
+  closeSheet(); backToSetup();
 };
 
 /* ---------- 起動（途中セーブがあれば再開） ---------- */
 var saved = load();
 if(saved && saved.players && saved.players.length >= 2){
   state = saved; roster = saved.players.map(function(p){ return p.name; });
+  setupFoul = foulPts();
   renderRoster();
-  if(state.finished) { showGame(); showResult(); }
+  if(state.finished){ buildBalls(); showResult(); }
   else showGame();
 } else {
+  showScreen("setup");
   renderRoster();
 }
 </script>
