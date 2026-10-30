@@ -99,6 +99,16 @@
   .fval input{width:30px; padding:0; border:none; outline:none; background:transparent; color:inherit;
               font:inherit; text-align:center; border-bottom:1px dashed rgba(255,79,96,.45);}
   .fval input:focus{border-bottom-style:solid;}
+  .fval.plus{color:var(--gold);} .fval.plus input{border-bottom-color:rgba(242,193,78,.45);}
+  .setting + .setting{margin-top:14px; padding-top:14px; border-top:1px solid var(--line);}
+  .chain.brk{border-color:rgba(64,170,255,.55); box-shadow:0 0 0 1px rgba(64,170,255,.15), 0 0 28px -6px rgba(64,170,255,.45);}
+  .chain.brk .mul, .chain.brk .h{color:#5cb8ff;}
+  .chain.brk .mul{font-size:20px; letter-spacing:.06em;}
+  .chain .calc{font-family:var(--num); font-size:15px; color:var(--text); margin-top:4px; letter-spacing:.02em;}
+  .chain .calc b{color:var(--gold); font-size:18px;}
+  .gain.brk{background:#123049; border-color:rgba(64,170,255,.5); color:#9fd3ff;}
+  .b-break{background:linear-gradient(180deg,#4fb3ff,#2a8ee0 55%,#1f74c2); color:#fff;
+           box-shadow:0 10px 26px -10px rgba(64,170,255,.7), inset 0 1px 0 rgba(255,255,255,.3);}
 
   .btn-primary{width:100%; height:58px; border-radius:16px; font-weight:900; font-size:17px; letter-spacing:.08em;
                color:#04140d; background:linear-gradient(180deg,#2fe39a,var(--felt) 55%,#0fa86b);
@@ -302,9 +312,17 @@
       <p class="label">Settings</p>
       <div class="setting">
         <div><div class="t">ファウルのペナルティ</div><div class="s">手玉を落とす／どの球にも当たらない</div></div>
-        <div class="stepper">
+        <div class="stepper" id="foulSetupStepper">
           <button data-step="-1" aria-label="減らす">−</button>
           <label class="fval">−<input id="foulSetupVal" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="2" aria-label="ファウルのペナルティ点数"></label>
+          <button data-step="1" aria-label="増やす">＋</button>
+        </div>
+      </div>
+      <div class="setting">
+        <div><div class="t">ブレイクボーナス</div><div class="s">ブレイクで入った球1個あたりの加算点</div></div>
+        <div class="stepper" id="bonusSetupStepper">
+          <button data-step="-1" aria-label="減らす">−</button>
+          <label class="fval plus">+<input id="bonusSetupVal" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="5" aria-label="ブレイクボーナス点数"></label>
           <button data-step="1" aria-label="増やす">＋</button>
         </div>
       </div>
@@ -331,7 +349,7 @@
       </div>
       <div class="chain" id="chain">
         <div class="mul" id="chainMul">×1</div>
-        <div class="txt"><div class="h" id="chainHead"></div><div class="d" id="chainDesc"></div></div>
+        <div class="txt"><div class="h" id="chainHead"></div><div class="d" id="chainDesc"></div><div class="calc hidden" id="breakCalc"></div></div>
         <div class="mini-ball" id="chainBall"></div>
       </div>
     </div>
@@ -371,7 +389,7 @@
     <button class="b-undo" id="undoBtn" aria-label="ひとつ戻す">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>
     </button>
-    <button class="b-miss" id="missBtn">外した<small>NEXT PLAYER</small></button>
+    <button class="b-miss" id="missBtn"><span id="missLabel">外した</span><small id="missSub">NEXT PLAYER</small></button>
     <button class="b-foul" id="foulBtn"><span id="foulLabel">ファウル −2</span><small>FOUL</small></button>
   </div>
 </div>
@@ -413,6 +431,8 @@ var BALL_COLORS = {1:"#f5c518",2:"#1f4fc4",3:"#d9262c",4:"#5a2a91",5:"#f0721a",
 var LS_KEY = "chain-billiards-v1";
 var RULES = [
   "球は<b>1〜15番</b>を全部使う。落とした球はテーブルに戻らない",
+  "<b>ブレイクボーナス</b>：ブレイクで入った球は「合計 ＋ 個数 × ボーナス点」 <span class='ex'>3・7・12 → 22 + 3×5 = <span class='g'>+37</span></span>。続投はチェーンなしから",
+  "ブレイクでファウルしたら、入った球の点数は無効でマイナス点＆交代",
   "1つ目の球はそのままの点数 <span class='ex'>2番 → <span class='g'>+2</span></span>",
   "同じプレイヤーが連続で入れると<b>「前の球 × 今の球」</b> <span class='ex'>2 → 6 = <span class='g'>+12</span></span> <span class='ex'>→ 5 = <span class='g'>+30</span></span>",
   "掛け算は<b>1桁同士だけ</b>。10〜15番はそのままの点数で、入れた後はチェーンもリセット <span class='ex'>4 → 11 = <span class='g'>+11</span></span>",
@@ -423,15 +443,23 @@ var RULES = [
 var $ = function(id){ return document.getElementById(id); };
 
 var state = null;
-function freshState(players, foulPenalty){
+function freshState(players, foulPenalty, breakBonus){
   return { players: players.map(function(n){return {name:n, score:0, log:[]};}),
            current: 0, lastBall: null, pocketed: [], history: [], finished:false,
-           foulPenalty: (typeof foulPenalty === "number" && foulPenalty >= 0) ? foulPenalty : 2 };
+           foulPenalty: (typeof foulPenalty === "number" && foulPenalty >= 0) ? foulPenalty : 2,
+           breakBonus: (typeof breakBonus === "number" && breakBonus >= 0) ? breakBonus : 5,
+           breaking: true, breakBalls: [] };
 }
 function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){} }
 function load(){ try{ var s = localStorage.getItem(LS_KEY); return s ? JSON.parse(s) : null; }catch(e){ return null; } }
 function clearSave(){ try{ localStorage.removeItem(LS_KEY); }catch(e){} }
 function foulPts(){ return (state && typeof state.foulPenalty === "number") ? state.foulPenalty : 2; }
+function bonusPts(){ return (state && typeof state.breakBonus === "number") ? state.breakBonus : 5; }
+function breakTotal(){
+  var sum = state.breakBalls.reduce(function(a, b){ return a + b; }, 0);
+  return { sum: sum, count: state.breakBalls.length, bonus: state.breakBalls.length * bonusPts(),
+           total: sum + state.breakBalls.length * bonusPts() };
+}
 function buzz(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(e){} }
 function esc(s){ var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
 
@@ -460,6 +488,7 @@ function showScreen(name){
 /* ---------- セットアップ ---------- */
 var roster = [];
 var setupFoul = 2;
+var setupBonus = 5;
 var ICON_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>';
 var ICON_DN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
 var ICON_X  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
@@ -483,6 +512,7 @@ function renderRoster(){
     "2人以上でスタートできます。並び順がターンの順番です。";
   $("startBtn").disabled = roster.length < 2;
   setFoulField($("foulSetupVal"), setupFoul);
+  setFoulField($("bonusSetupVal"), setupBonus);
 }
 function addPlayer(){
   var v = nameInput.value.trim();
@@ -491,10 +521,13 @@ function addPlayer(){
 }
 $("addBtn").onclick = addPlayer;
 nameInput.addEventListener("keydown", function(e){ if(e.key === "Enter" && !e.isComposing) addPlayer(); });
-Array.prototype.forEach.call(document.querySelectorAll("#setup .stepper button"), function(b){
+Array.prototype.forEach.call(document.querySelectorAll("#foulSetupStepper button"), function(b){
   b.onclick = function(){ setupFoul = Math.max(0, Math.min(99, setupFoul + Number(b.dataset.step))); renderRoster(); };
 });
-/* ファウル点数の入力欄：数字のみ受け付け、表示上は常にマイナス */
+Array.prototype.forEach.call(document.querySelectorAll("#bonusSetupStepper button"), function(b){
+  b.onclick = function(){ setupBonus = Math.max(0, Math.min(99, setupBonus + Number(b.dataset.step))); renderRoster(); };
+});
+/* 点数の入力欄：数字のみ受け付け、符号（−／＋）は表示側で固定 */
 function setFoulField(el, v){ el.dataset.cur = v; if(document.activeElement !== el) el.value = v; }
 function bindFoulField(el, apply){
   el.addEventListener("input", function(){ el.value = el.value.replace(/[^0-9０-９]/g, "").replace(/[０-９]/g, function(c){ return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); }).slice(0, 2); });
@@ -508,10 +541,11 @@ function bindFoulField(el, apply){
   el.addEventListener("blur", function(){ el.value = el.dataset.cur; });
 }
 bindFoulField($("foulSetupVal"), function(v){ setupFoul = v; renderRoster(); });
+bindFoulField($("bonusSetupVal"), function(v){ setupBonus = v; renderRoster(); });
 bindFoulField($("foulGameVal"), function(v){ if(!state) return; state.foulPenalty = v; save(); render(true); toast("ファウルのペナルティを −" + v + " 点にしました"); });
 $("startBtn").onclick = function(){
-  state = freshState(roster.slice(), setupFoul);
-  save(); showGame(); toast("ゲームスタート！ " + state.players[0].name + " から");
+  state = freshState(roster.slice(), setupFoul, setupBonus);
+  save(); showGame(); toast("ゲームスタート！ " + state.players[0].name + " のブレイクから");
 };
 
 /* ---------- ゲーム ---------- */
@@ -520,7 +554,7 @@ function ptsFor(n){ return (state.lastBall !== null && state.lastBall <= 9 && n 
 function snapshot(){
   state.history.push(JSON.stringify({ players: state.players, current: state.current,
     lastBall: state.lastBall, pocketed: state.pocketed, finished: state.finished,
-    foulPenalty: state.foulPenalty }));
+    foulPenalty: state.foulPenalty, breaking: state.breaking, breakBalls: state.breakBalls }));
   if(state.history.length > 200) state.history.shift();
 }
 function toast(msg){
@@ -562,6 +596,16 @@ function buildBalls(){
 function pocket(n, el){
   if(state.finished || state.pocketed.indexOf(n) >= 0) return;
   snapshot();
+  if(state.breaking){
+    // ブレイク中は入った球を記録するだけ（順番は問わない）。点数は「ブレイク確定」で加算
+    state.breakBalls = state.breakBalls.concat(n);
+    state.pocketed = state.pocketed.concat(n);
+    buzz(12);
+    if(el) el.classList.add("sink");
+    save();
+    setTimeout(function(){ if(el) el.classList.remove("sink"); render(); }, el ? 340 : 0);
+    return;
+  }
   var p = cur();
   var pts = ptsFor(n);
   p.score += pts;
@@ -584,16 +628,41 @@ function nextPlayer(){
 }
 function miss(){
   if(state.finished) return;
+  if(state.breaking){ confirmBreak(); return; }
   snapshot(); nextPlayer(); save(); render(true); buzz(8);
   toast("交代 → " + cur().name + " のターン");
+}
+function confirmBreak(){
+  snapshot();
+  state.breaking = false;
+  var p = cur(), bt = breakTotal();
+  state.breakBalls = [];
+  if(!bt.count){
+    nextPlayer(); save(); render(true); buzz(8);
+    toast("ブレイクで入らず → " + cur().name + " のターン");
+    return;
+  }
+  p.score += bt.total;
+  p.log.push("ブレイク" + bt.count + "個(+" + bt.total + ")");
+  state.lastBall = null;
+  if(state.pocketed.length >= 15) state.finished = true;
+  save(); render(); pop("+" + bt.total); buzz([12, 40, 18, 40, 18]);
+  toast("ブレイクボーナス +" + bt.total + "点！ 続けてどうぞ");
+  if(state.finished) setTimeout(showResult, 900);
 }
 function foul(){
   if(state.finished) return;
   snapshot();
   var fp = foulPts();
-  var p = cur(); p.score -= fp; p.log.push("ファウル(-" + fp + ")");
+  var p = cur(); p.score -= fp; p.log.push((state.breaking ? "ブレイクファウル" : "ファウル") + "(-" + fp + ")");
+  if(state.breaking){
+    // ブレイクでのファウル：入った球は戻さないが点数は無効
+    state.breaking = false; state.breakBalls = [];
+    if(state.pocketed.length >= 15) state.finished = true;
+  }
   nextPlayer(); save(); render(true); buzz([30, 50, 30]);
   toast(p.name + " ファウル −" + fp + "点 → " + cur().name + " のターン");
+  if(state.finished) setTimeout(showResult, 900);
 }
 function undo(){
   if(!state.history.length){ toast("戻せる操作がありません"); return; }
@@ -601,6 +670,7 @@ function undo(){
   state.players = s.players; state.current = s.current; state.lastBall = s.lastBall;
   state.pocketed = s.pocketed; state.finished = s.finished;
   if(typeof s.foulPenalty === "number") state.foulPenalty = s.foulPenalty;
+  state.breaking = !!s.breaking; state.breakBalls = s.breakBalls || [];
   save(); render(true); toast("ひとつ戻しました");
 }
 $("missBtn").onclick = miss;
@@ -616,7 +686,28 @@ function render(instant){
 
   var lb = state.lastBall, chain = $("chain"), mb = $("chainBall");
   mb.innerHTML = "";
-  if(lb === null){
+  chain.classList.toggle("brk", !!state.breaking);
+  $("breakCalc").classList.toggle("hidden", !state.breaking);
+  if(state.breaking){
+    var bt = breakTotal();
+    chain.classList.remove("on");
+    $("chainMul").textContent = "BREAK";
+    $("chainHead").textContent = "BREAK SHOT";
+    $("chainDesc").textContent = bt.count ? "入った球をすべてタップ（順番は自由）→ ブレイク確定" :
+      "入った球をすべてタップ（順番は自由）。1個につき +" + bonusPts() + " ボーナス";
+    $("breakCalc").innerHTML = bt.count ? bt.sum + " + " + bt.count + "個×" + bonusPts() + " = <b>+" + bt.total + "</b>" : "";
+    $("breakCalc").classList.toggle("hidden", !bt.count);
+    $("missLabel").textContent = bt.count ? "ブレイク確定" : "入らなかった";
+    $("missSub").textContent = bt.count ? "+" + bt.total + " · CONTINUE" : "NEXT PLAYER";
+    $("missBtn").className = bt.count ? "b-break" : "b-miss";
+  } else {
+    $("missLabel").textContent = "外した";
+    $("missSub").textContent = "NEXT PLAYER";
+    $("missBtn").className = "b-miss";
+  }
+  if(state.breaking){
+    // ブレイク中の表示は上で設定済み
+  } else if(lb === null){
     chain.classList.remove("on");
     $("chainMul").textContent = "×1";
     $("chainHead").textContent = "NO CHAIN";
@@ -642,9 +733,10 @@ function render(instant){
   Array.prototype.forEach.call($("ballGrid").children, function(b){
     var n = Number(b.dataset.ball), done = state.pocketed.indexOf(n) >= 0;
     b.classList.toggle("done", done);
-    var g = b.querySelector(".gain"), v = ptsFor(n);
+    var g = b.querySelector(".gain"), v = state.breaking ? n : ptsFor(n);
     g.textContent = "+" + v;
-    g.classList.toggle("hot", v > n);
+    g.classList.toggle("hot", !state.breaking && v > n);
+    g.classList.toggle("brk", !!state.breaking);
   });
   renderBoard($("scoreBody"), false);
 }
@@ -668,7 +760,7 @@ function renderBoard(ul, final){
       '<i class="bar" style="width:' + Math.max(0, e.p.score / max * 100) + '%"></i>';
     if(final){
       html += '<div class="lg">' + (e.p.log.length ? e.p.log.map(function(l){
-        return '<span' + (l.indexOf("ファウル") === 0 ? ' class="f"' : "") + ">" + esc(l) + "</span>";
+        return '<span' + (l.indexOf("ファウル") >= 0 ? ' class="f"' : "") + ">" + esc(l) + "</span>";
       }).join("") : "<span>記録なし</span>") + "</div>";
     }
     li.innerHTML = html;
@@ -695,7 +787,7 @@ function backToSetup(){
 }
 $("againBtn").onclick = function(){
   var names = state.players.map(function(p){ return p.name; });
-  state = freshState(names, foulPts()); save(); showGame(); toast("新しいゲーム！ " + names[0] + " から");
+  state = freshState(names, foulPts(), bonusPts()); save(); showGame(); toast("新しいゲーム！ " + names[0] + " のブレイクから");
 };
 $("backBtn").onclick = backToSetup;
 
@@ -719,7 +811,7 @@ $("quitBtn").onclick = function(){
   var q = this;
   if(!q.classList.contains("arm")){ q.classList.add("arm"); q.textContent = "もう一度タップで確定（スコアは消えます）"; return; }
   roster = state.players.map(function(p){ return p.name; });
-  setupFoul = foulPts();
+  setupFoul = foulPts(); setupBonus = bonusPts();
   closeSheet(); backToSetup();
 };
 
@@ -727,7 +819,8 @@ $("quitBtn").onclick = function(){
 var saved = load();
 if(saved && saved.players && saved.players.length >= 2){
   state = saved; roster = saved.players.map(function(p){ return p.name; });
-  setupFoul = foulPts();
+  setupFoul = foulPts(); setupBonus = bonusPts();
+  if(!state.breakBalls) state.breakBalls = [];
   renderRoster();
   if(state.finished){ buildBalls(); showResult(); }
   else showGame();
