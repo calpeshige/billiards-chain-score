@@ -270,6 +270,7 @@
   .btn-danger-outline{width:100%; height:50px; border-radius:14px; font-weight:700; font-size:15px; margin-top:10px;
                       color:var(--danger); border:1px solid rgba(255,79,96,.4); background:rgba(255,79,96,.06);}
   .btn-danger-outline.arm{background:var(--danger); color:#fff;}
+  .quit-btn{margin-top:16px;}
 
   /* トースト */
   .toast{position:fixed; left:50%; bottom:calc(96px + env(safe-area-inset-bottom)); z-index:30;
@@ -455,6 +456,7 @@
     <div class="panel board-panel">
       <p class="label">Leaderboard</p>
       <ul class="board" id="scoreBody"></ul>
+      <button class="btn-danger-outline quit-btn" id="quitBtn">ゲームをやめて名簿に戻る</button>
     </div>
 
     <div class="dock hidden" id="dock">
@@ -531,9 +533,6 @@
       <p class="label">How to play</p>
       <ol class="rules" id="rulesSheet"></ol>
     </div>
-    <div class="sec" id="quitWrap">
-      <button class="btn-danger-outline" id="quitBtn">ゲームをやめて名簿に戻る</button>
-    </div>
     <button class="btn-ghost" id="closeSheet">閉じる</button>
   </div>
 </div>
@@ -598,7 +597,6 @@ function showScreen(name){
   document.body.classList.toggle("no-dock", name !== "game");
   $("remainChip").classList.toggle("hidden", name !== "game");
   $("sheetGameOnly").classList.toggle("hidden", name !== "game");
-  $("quitWrap").classList.toggle("hidden", name !== "game");
   window.scrollTo(0, 0);
 }
 
@@ -922,7 +920,6 @@ $("backBtn").onclick = backToSetup;
 function openSheet(){ $("scrim").classList.add("open"); $("sheet").classList.add("open"); }
 function closeSheet(){
   $("scrim").classList.remove("open"); $("sheet").classList.remove("open"); $("foulSheet").classList.remove("open");
-  var q = $("quitBtn"); q.classList.remove("arm"); q.textContent = "ゲームをやめて名簿に戻る";
 }
 $("menuBtn").onclick = openSheet;
 $("scrim").onclick = closeSheet;
@@ -938,12 +935,22 @@ Array.prototype.forEach.call(document.querySelectorAll("#foulGameStepper button"
     save(); render(true);
   };
 });
+/* ---------- ゲームをやめる（誤操作防止のため2回タップで確定） ---------- */
+function disarmQuit(){
+  var q = $("quitBtn"); clearTimeout(q._tm);
+  q.classList.remove("arm"); q.textContent = "ゲームをやめて名簿に戻る";
+}
 $("quitBtn").onclick = function(){
   var q = this;
-  if(!q.classList.contains("arm")){ q.classList.add("arm"); q.textContent = "もう一度タップで確定（スコアは消えます）"; return; }
+  if(!q.classList.contains("arm")){
+    q.classList.add("arm"); q.textContent = "もう一度タップで確定（スコアは消えます）";
+    clearTimeout(q._tm); q._tm = setTimeout(disarmQuit, 4000);
+    return;
+  }
+  disarmQuit();
   roster = state.players.map(function(p){ return p.name; });
   setupFoul = foulPts(); setupBonus = bonusPts();
-  closeSheet(); backToSetup();
+  backToSetup();
 };
 
 /* ---------- 起動（途中セーブがあれば再開） ---------- */
