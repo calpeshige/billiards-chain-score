@@ -95,7 +95,10 @@
   .setting .s{color:var(--muted); font-size:12px; margin-top:2px;}
   .stepper{display:flex; align-items:center; background:var(--bg); border:1px solid var(--line-2); border-radius:14px; flex:none;}
   .stepper button{width:42px; height:42px; font-size:22px; color:var(--muted);}
-  .stepper output{min-width:44px; text-align:center; font-family:var(--num); font-weight:600; font-size:20px; color:var(--danger);}
+  .fval{display:flex; align-items:center; justify-content:center; font-family:var(--num); font-weight:600; font-size:20px; color:var(--danger); cursor:text;}
+  .fval input{width:30px; padding:0; border:none; outline:none; background:transparent; color:inherit;
+              font:inherit; text-align:center; border-bottom:1px dashed rgba(255,79,96,.45);}
+  .fval input:focus{border-bottom-style:solid;}
 
   .btn-primary{width:100%; height:58px; border-radius:16px; font-weight:900; font-size:17px; letter-spacing:.08em;
                color:#04140d; background:linear-gradient(180deg,#2fe39a,var(--felt) 55%,#0fa86b);
@@ -301,19 +304,14 @@
         <div><div class="t">ファウルのペナルティ</div><div class="s">手玉を落とす／どの球にも当たらない</div></div>
         <div class="stepper">
           <button data-step="-1" aria-label="減らす">−</button>
-          <output id="foulSetupVal">−2</output>
+          <label class="fval">−<input id="foulSetupVal" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="2" aria-label="ファウルのペナルティ点数"></label>
           <button data-step="1" aria-label="増やす">＋</button>
         </div>
       </div>
     </div>
 
     <button class="btn-primary" id="startBtn" disabled>GAME START</button>
-    <p class="note">途中の状態は自動保存。閉じても続きから再開できます。</p>
-
-    <div class="panel" style="margin-top:24px">
-      <p class="label">How to play</p>
-      <ol class="rules" id="rulesSetup"></ol>
-    </div>
+    <p class="note">途中の状態は自動保存。閉じても続きから再開できます。<br>ルールは右上の ≡ から確認できます。</p>
   </section>
 
   <!-- ゲーム -->
@@ -389,7 +387,7 @@
         <div><div class="t">ファウルのペナルティ</div><div class="s">変更はこの後のファウルから反映</div></div>
         <div class="stepper" id="foulGameStepper">
           <button data-step="-1" aria-label="減らす">−</button>
-          <output id="foulGameVal">−2</output>
+          <label class="fval">−<input id="foulGameVal" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="2" aria-label="ファウルのペナルティ点数"></label>
           <button data-step="1" aria-label="増やす">＋</button>
         </div>
       </div>
@@ -444,7 +442,7 @@ function ballEl(n, tag){
   b.innerHTML = '<span class="face"><span class="n">' + n + "</span></span>";
   return b;
 }
-["rulesSetup","rulesSheet"].forEach(function(id){
+["rulesSheet"].forEach(function(id){
   $(id).innerHTML = RULES.map(function(r){ return "<li>" + r + "</li>"; }).join("");
 });
 
@@ -484,7 +482,7 @@ function renderRoster(){
   $("rosterEmpty").textContent = roster.length === 1 ? "あと1人追加するとスタートできます。" :
     "2人以上でスタートできます。並び順がターンの順番です。";
   $("startBtn").disabled = roster.length < 2;
-  $("foulSetupVal").textContent = "−" + setupFoul;
+  setFoulField($("foulSetupVal"), setupFoul);
 }
 function addPlayer(){
   var v = nameInput.value.trim();
@@ -496,6 +494,21 @@ nameInput.addEventListener("keydown", function(e){ if(e.key === "Enter" && !e.is
 Array.prototype.forEach.call(document.querySelectorAll("#setup .stepper button"), function(b){
   b.onclick = function(){ setupFoul = Math.max(0, Math.min(99, setupFoul + Number(b.dataset.step))); renderRoster(); };
 });
+/* ファウル点数の入力欄：数字のみ受け付け、表示上は常にマイナス */
+function setFoulField(el, v){ el.dataset.cur = v; if(document.activeElement !== el) el.value = v; }
+function bindFoulField(el, apply){
+  el.addEventListener("input", function(){ el.value = el.value.replace(/[^0-9０-９]/g, "").replace(/[０-９]/g, function(c){ return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); }).slice(0, 2); });
+  el.addEventListener("focus", function(){ el.select(); });
+  el.addEventListener("keydown", function(e){ if(e.key === "Enter") el.blur(); });
+  el.addEventListener("change", function(){
+    var v = parseInt(el.value, 10);
+    if(!isNaN(v)) apply(Math.min(99, v));
+    el.blur();
+  });
+  el.addEventListener("blur", function(){ el.value = el.dataset.cur; });
+}
+bindFoulField($("foulSetupVal"), function(v){ setupFoul = v; renderRoster(); });
+bindFoulField($("foulGameVal"), function(v){ if(!state) return; state.foulPenalty = v; save(); render(true); toast("ファウルのペナルティを −" + v + " 点にしました"); });
 $("startBtn").onclick = function(){
   state = freshState(roster.slice(), setupFoul);
   save(); showGame(); toast("ゲームスタート！ " + state.players[0].name + " から");
@@ -623,7 +636,7 @@ function render(instant){
   }
 
   $("foulLabel").textContent = "ファウル −" + foulPts();
-  $("foulGameVal").textContent = "−" + foulPts();
+  setFoulField($("foulGameVal"), foulPts());
   $("remainNum").textContent = 15 - state.pocketed.length;
 
   Array.prototype.forEach.call($("ballGrid").children, function(b){
